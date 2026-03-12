@@ -336,6 +336,40 @@ const commandDefinitions = [
     )
     .toJSON(),
   new SlashCommandBuilder()
+    .setName("feat")
+    .setDescription("Review available feats or claim an unlocked feat slot.")
+    .addStringOption((option) =>
+      option
+        .setName("action")
+        .setDescription("Feat action")
+        .setRequired(true)
+        .addChoices(
+          { name: "list", value: "list" },
+          { name: "take", value: "take" }
+        )
+    )
+    .addStringOption((option) =>
+      option
+        .setName("feat_id")
+        .setDescription("Feat identifier to claim")
+        .setRequired(false)
+    )
+    .addStringOption((option) =>
+      option
+        .setName("ability_id")
+        .setDescription("Ability choice for feats such as resilient")
+        .setRequired(false)
+        .addChoices(
+          { name: "strength", value: "strength" },
+          { name: "dexterity", value: "dexterity" },
+          { name: "constitution", value: "constitution" },
+          { name: "intelligence", value: "intelligence" },
+          { name: "wisdom", value: "wisdom" },
+          { name: "charisma", value: "charisma" }
+        )
+    )
+    .toJSON(),
+  new SlashCommandBuilder()
     .setName("dungeon")
     .setDescription("Dungeon session lifecycle commands.")
     .addSubcommand((subcommand) =>

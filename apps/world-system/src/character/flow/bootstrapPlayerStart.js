@@ -5,6 +5,7 @@ const { CharacterManager, InMemoryCharacterStore } = require("../character.manag
 const { createInventoryRecord } = require("../../../../inventory-system/src/inventory.schema");
 const { applyCharacterSelections } = require("./applyCharacterSelections");
 const { getClassData, getClassOptionData } = require("../rules/classRules");
+const { applyDerivedSavingThrowState } = require("../rules/saveRules");
 
 function success(eventType, payload) {
   return {
@@ -501,12 +502,12 @@ function bootstrapPlayerStart(input) {
     return ensuredInventory;
   }
 
-  let characterWithInventory = {
+  let characterWithInventory = applyDerivedSavingThrowState({
     ...createdCharacterOut.payload.character,
     inventory_id: ensuredInventory.payload.inventory.inventory_id,
     inventory_ref: "inventory:" + ensuredInventory.payload.inventory.inventory_id,
     updated_at: new Date().toISOString()
-  };
+  });
 
   const hasAnySelectionInput = Boolean(
     requestedRaceId || requestedRaceOptionId || requestedClassId || requestedSecondaryClassId
@@ -572,7 +573,7 @@ function bootstrapPlayerStart(input) {
       );
     }
 
-    characterWithInventory = selectionOut.payload.character_profile;
+    characterWithInventory = applyDerivedSavingThrowState(selectionOut.payload.character_profile);
     characterWithInventory.multiclass = {
       enabled: true,
       classes: [

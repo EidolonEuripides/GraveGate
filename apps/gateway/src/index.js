@@ -95,6 +95,18 @@ function cleanText(value, fallback) {
   return safe === "" ? fallback || "Unknown" : safe;
 }
 
+function humanizeIdentifier(value, fallback) {
+  const safe = String(value || "").trim();
+  if (!safe) {
+    return fallback || "Unknown";
+  }
+  return safe
+    .split(/[_-]+/g)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
 function normalizeSelection(value) {
   return String(value || "").trim().toLowerCase();
 }
@@ -415,9 +427,20 @@ function summarizeInventoryPreview(entries) {
     const safe = entry && typeof entry === "object" ? entry : {};
     const name = cleanText(safe.item_name, safe.item_id || "unknown");
     const quantity = Number.isFinite(Number(safe.quantity)) ? Number(safe.quantity) : null;
-    const suffix = safe.equipped === true
-      ? ` [equipped${safe.equipped_slot ? `:${cleanText(safe.equipped_slot, "slot")}` : ""}]`
-      : "";
+    const tags = [];
+    if (safe.equipped === true) {
+      tags.push(`equipped${safe.equipped_slot ? `:${cleanText(safe.equipped_slot, "slot")}` : ""}`);
+    }
+    if (safe.attuned === true) {
+      tags.push("attuned");
+    }
+    if (safe.unidentified === true) {
+      tags.push("sealed");
+    }
+    if (safe.magical === true || safe.requires_attunement === true) {
+      tags.push("arcane");
+    }
+    const suffix = tags.length > 0 ? ` [${tags.join(", ")}]` : "";
     const label = quantity && quantity > 1 ? `${name} x${quantity}` : name;
     return `${label}${suffix}`;
   }).join(" | ");
@@ -428,12 +451,13 @@ function summarizeRoomExits(exits) {
   if (list.length === 0) {
     return "(none)";
   }
-  return list.map((entry) => {
+  const summary = list.map((entry) => {
     const direction = cleanText(entry && entry.direction, "unknown");
     const target = cleanText(entry && entry.to_room_id, "unknown");
     const locked = entry && entry.locked === true ? " [locked]" : "";
     return `${direction} -> ${target}${locked}`;
   }).join(" | ");
+  return `${summary} • routes available`;
 }
 
 function summarizeVisibleRoomObjects(objects) {
@@ -504,7 +528,9 @@ function summarizeSpellEffect(spellEffect) {
   if (!safe) {
     return [];
   }
-  const lines = [`Spell Effect: ${cleanText(safe.spell_id, "unknown spell")}`];
+  const lines = [
+    `Spell Effect: ${cleanText(safe.spell_name, humanizeIdentifier(safe.spell_id, "Unknown Spell"))}`
+  ];
   if (safe.aura_summary) {
     lines.push(`Aura: ${cleanText(safe.aura_summary, "unknown aura")}`);
   }
@@ -512,7 +538,7 @@ function summarizeSpellEffect(spellEffect) {
     lines.push(`Identified: ${cleanText(safe.identified_item_name, safe.identified_item_id || "unknown item")}`);
   }
   if (safe.object_state) {
-    lines.push(`Effect State: ${cleanText(safe.object_state, "changed")}`);
+    lines.push(`Effect State: ${humanizeIdentifier(safe.object_state, "Changed")}`);
   }
   return lines;
 }
@@ -531,6 +557,43 @@ function summarizeSkillCheck(skillCheck) {
   ];
 }
 
+function getInventoryPreviewEntries(inventory) {
+  const safe = inventory && typeof inventory === "object" ? inventory : {};
+  const buckets = [
+    safe.equipment_preview,
+    safe.stackable_preview,
+    safe.quest_preview,
+    safe.magical_preview,
+    safe.unidentified_preview,
+    safe.tradeable_items
+  ];
+  return buckets.flatMap((entries) => Array.isArray(entries) ? entries : []);
+}
+
+function resolveInventoryItemName(inventory, itemId) {
+  const target = cleanText(itemId, "");
+  if (!target) {
+    return "unknown item";
+  }
+  const entries = getInventoryPreviewEntries(inventory);
+  for (let index = 0; index < entries.length; index += 1) {
+    const entry = entries[index] && typeof entries[index] === "object" ? entries[index] : {};
+    if (cleanText(entry.item_id, "") === target) {
+      return cleanText(entry.item_name, humanizeIdentifier(target, target));
+    }
+  }
+  return humanizeIdentifier(target, target);
+}
+
+function summarizeAttunedLinks(inventory) {
+  const safe = inventory && typeof inventory === "object" ? inventory : {};
+  const items = Array.isArray(safe.attuned_items) ? safe.attuned_items : [];
+  if (items.length === 0) {
+    return "(none)";
+  }
+  return items.map((itemId) => `\`${resolveInventoryItemName(safe, itemId)}\` • resonating`).join("\n");
+}
+
 function summarizeRoomForReply(room) {
   const safe = room && typeof room === "object" ? room : null;
   if (!safe) {
@@ -539,7 +602,7 @@ function summarizeRoomForReply(room) {
   return [
     `Room: ${cleanText(safe.name, safe.room_id || "unknown")}`,
     `Type: ${cleanText(safe.room_type, "unknown")}`,
-    safe.description ? `Description: ${cleanText(safe.description, "")}` : null,
+    safe.description ? `Scene: ${cleanText(safe.description, "")}` : null,
     `Exits: ${summarizeRoomExits(safe.exits)}`,
     `Objects: ${summarizeVisibleRoomObjects(safe.visible_objects)}`
   ].filter(Boolean);
@@ -707,6 +770,22 @@ function buildSaveSummary(savingThrows) {
   return labels.map(([key, label]) => `${label} ${formatModifier(safe[key])}`).join("  |  ");
 }
 
+function summarizeFeatPreview(feats) {
+  const safeFeats = Array.isArray(feats) ? feats : [];
+  if (safeFeats.length === 0) {
+    return "(none)";
+  }
+  return safeFeats
+    .slice(0, 4)
+    .map((entry) => {
+      if (entry && typeof entry === "object") {
+        return cleanText(entry.name, entry.feat_id || "unknown");
+      }
+      return cleanText(entry, "unknown");
+    })
+    .join(", ");
+}
+
 function toDisplayTag(value, fallback) {
   const safe = cleanText(value, fallback || "(none)");
   return safe === "(none)" ? safe : `\`${safe}\``;
@@ -718,6 +797,8 @@ function buildProfileEmbed(data) {
   const knownSpellIds = character.spellbook && Array.isArray(character.spellbook.known_spell_ids)
     ? character.spellbook.known_spell_ids
     : [];
+  const feats = Array.isArray(character.feats) ? character.feats : [];
+  const featSlots = character.feat_slots && typeof character.feat_slots === "object" ? character.feat_slots : {};
   const hp = character.hp_summary && typeof character.hp_summary === "object" ? character.hp_summary : {};
   const title = `${cleanText(character.name, "Unknown Adventurer")} | Hunter Record`;
   const subtitle = [
@@ -744,6 +825,8 @@ function buildProfileEmbed(data) {
         name: "Arcana",
         value: [
           `Known Spells: ${knownSpellIds.length}`,
+          `Feats: ${feats.length}`,
+          `Feat Slots: ${Number.isFinite(Number(featSlots.used_slots)) ? Number(featSlots.used_slots) : 0}/${Number.isFinite(Number(featSlots.total_slots)) ? Number(featSlots.total_slots) : 0}`,
           `Attunement: ${Number.isFinite(Number(attunement.slots_used)) ? Number(attunement.slots_used) : 0}/${Number.isFinite(Number(attunement.attunement_slots)) ? Number(attunement.attunement_slots) : 3}`,
           `Save DC: ${character.spellsave_dc === null || character.spellsave_dc === undefined ? "(none)" : character.spellsave_dc}`,
           `Inventory: ${toDisplayTag(character.inventory_id, "(none)")}`
@@ -782,7 +865,8 @@ function buildProfileEmbed(data) {
         name: "Origin",
         value: [
           `Background: ${toDisplayTag(character.background, "unknown")}`,
-          `Spellcasting: ${toDisplayTag(character.spellcasting_ability, "(none)")}`
+          `Spellcasting: ${toDisplayTag(character.spellcasting_ability, "(none)")}`,
+          `Feats: ${summarizeFeatPreview(feats)}`
         ].join("\n"),
         inline: false
       }
@@ -796,7 +880,7 @@ function buildInventoryEmbed(data) {
   return new EmbedBuilder()
     .setColor(0x2d8f6f)
     .setTitle("Dimensional Pack")
-    .setDescription(`Inventory ${toDisplayTag(inventory.inventory_id, "unknown")}`)
+    .setDescription(`Inventory ${toDisplayTag(inventory.inventory_id, "unknown")} • field-ready storage and relic seal log`)
     .addFields(
       {
         name: "Ledger",
@@ -838,7 +922,7 @@ function buildInventoryDetailEmbed(data, tab) {
     return new EmbedBuilder()
       .setColor(0x2d6d8f)
       .setTitle("Dimensional Pack | Equipment")
-      .setDescription(`Inventory ${toDisplayTag(inventory.inventory_id, "unknown")}`)
+      .setDescription(`Inventory ${toDisplayTag(inventory.inventory_id, "unknown")} • arms, armor, and expedition gear`)
       .addFields(
         {
           name: "Equipped Cache",
@@ -849,6 +933,11 @@ function buildInventoryDetailEmbed(data, tab) {
           name: "Quest Cache",
           value: summarizeInventoryPreview(inventory.quest_preview),
           inline: false
+        },
+        {
+          name: "Field Readiness",
+          value: "Use this tab to keep the active loadout clear before you step into a fight.",
+          inline: false
         }
       )
       .setFooter({ text: "Armaments and relics" });
@@ -858,7 +947,7 @@ function buildInventoryDetailEmbed(data, tab) {
     return new EmbedBuilder()
       .setColor(0x7a4acb)
       .setTitle("Dimensional Pack | Arcane Ledger")
-      .setDescription(`Inventory ${toDisplayTag(inventory.inventory_id, "unknown")}`)
+      .setDescription(`Inventory ${toDisplayTag(inventory.inventory_id, "unknown")} • relic resonance, seals, and attunement drift`)
       .addFields(
         {
           name: "Magical Cache",
@@ -872,9 +961,12 @@ function buildInventoryDetailEmbed(data, tab) {
         },
         {
           name: "Attuned Links",
-          value: Array.isArray(inventory.attuned_items) && inventory.attuned_items.length > 0
-            ? inventory.attuned_items.map((entry) => `\`${entry}\``).join(" | ")
-            : "(none)",
+          value: summarizeAttunedLinks(inventory),
+          inline: false
+        },
+        {
+          name: "Arcane Read",
+          value: "Sealed items need identification. Resonant items may demand attunement before their full pattern answers back.",
           inline: false
         }
       )
@@ -1038,17 +1130,29 @@ function summarizeCombatParticipantLine(summary, entry) {
   const hp = Number.isFinite(Number(safe.current_hp)) && Number.isFinite(Number(safe.max_hp))
     ? `${Number(safe.current_hp)}/${Number(safe.max_hp)}`
     : "?/?";
+  const hpCurrent = Number(safe.current_hp);
+  const hpMax = Number(safe.max_hp);
   const list = Array.isArray(safe.conditions) ? safe.conditions : [];
   const movement = Number.isFinite(Number(safe.movement_remaining))
     ? Number(safe.movement_remaining)
     : "?";
+  let vitality = "steady";
+  if (Number.isFinite(hpCurrent) && Number.isFinite(hpMax) && hpMax > 0) {
+    const ratio = hpCurrent / hpMax;
+    if (ratio <= 0.25) {
+      vitality = "fading";
+    } else if (ratio <= 0.5) {
+      vitality = "bloodied";
+    }
+  }
   return [
     `${marker}${cleanText(safe.participant_id, "unknown")} ${hp} HP`,
     `Cond ${list.length > 0 ? list.map((condition) => formatConditionLabel(condition)).join(", ") : "none"}`,
     `A ${safe.action_available === true ? "up" : "spent"}`,
     `B ${safe.bonus_action_available === true ? "up" : "spent"}`,
     `R ${safe.reaction_available === true ? "up" : "spent"}`,
-    `M ${movement}`
+    `M ${movement}`,
+    vitality
   ].join(" | ");
 }
 
@@ -1083,8 +1187,9 @@ function buildCombatStateEmbed(summary) {
         value: activeParticipant
           ? [
               `Actor: ${cleanText(activeParticipant.participant_id, "unknown")}`,
-              `Resources: ${activeResources}`,
-              `Conditions: ${activeConditions || "none"}`
+              `Resources: ${activeResources}${activeParticipant.action_available === true ? " • ready to act" : " • pressure already spent"}`,
+              `Conditions: ${activeConditions || "none"}`,
+              `Tempo: ${activeParticipant.reaction_available === true ? "watching for openings" : "reaction already committed"}`
             ].join("\n")
           : "(no active combatant)",
         inline: false
@@ -1188,7 +1293,7 @@ function buildShopEmbed(data) {
         value: stock.length > 0
           ? stock.slice(0, 5).map((entry) => {
             const qty = entry && entry.infinite_stock ? "∞ stock" : `${String(entry && entry.quantity_available !== null ? entry.quantity_available : 0)} left`;
-            return `\`${cleanText(entry && entry.item_name, entry && entry.item_id || "item")}\` • ${Number(entry && entry.price_gold || 0)}g • ${qty}`;
+            return `\`${cleanText(entry && entry.item_name, entry && entry.item_id || "item")}\` • ${Number(entry && entry.price_gold || 0)}g • ${qty} • expedition stock`;
           }).join("\n")
           : "(no stock)",
         inline: false
@@ -1196,7 +1301,7 @@ function buildShopEmbed(data) {
       {
         name: "Sellable Pack",
         value: sellable.length > 0
-          ? sellable.slice(0, 5).map((entry) => `\`${cleanText(entry.item_name, entry.item_id)}\` • ${Number(entry.quantity || 1)} • ${Number(entry.sell_price_gold || 0)}g`).join("\n")
+          ? sellable.slice(0, 5).map((entry) => `\`${cleanText(entry.item_name, entry.item_id)}\` • ${Number(entry.quantity || 1)} • ${Number(entry.sell_price_gold || 0)}g • ready for barter`).join("\n")
           : "(no sellable items)",
         inline: false
       },
@@ -1277,7 +1382,7 @@ function buildCraftEmbed(data) {
   return new EmbedBuilder()
     .setColor(0x8c5b2d)
     .setTitle("Fieldcraft Ledger")
-    .setDescription(`Supported starter recipes • Filter: ${filter}`)
+    .setDescription(`Supported starter recipes • Filter: ${filter} • camp-ready craft notes`)
     .addFields(
       {
         name: "Ready Now",
@@ -1294,7 +1399,8 @@ function buildCraftEmbed(data) {
             return [
               `\`${cleanText(entry.recipe_name, entry.recipe_id)}\` • ${entry.craftable ? "Ready" : "Missing mats"}`,
               detailLine,
-              `Materials: ${materialText}`
+              `Materials: ${materialText}`,
+              entry.craftable ? "Field note: workable with the current pack." : "Field note: gather more before the next camp."
             ].join("\n");
           }).join("\n\n")
           : "(no recipes for this filter)",
@@ -1409,6 +1515,34 @@ function summarizeSpellResolution(data) {
     return "Effect applied - the magic settles in";
   }
   return resolutionType;
+}
+
+function summarizeConcentrationUpdate(data) {
+  const lines = [];
+  const concentrationResult = data && data.concentration_result && typeof data.concentration_result === "object"
+    ? data.concentration_result
+    : null;
+  const concentrationStarted = data && data.concentration_started && typeof data.concentration_started === "object"
+    ? data.concentration_started
+    : null;
+  const concentrationReplaced = data && data.concentration_replaced && typeof data.concentration_replaced === "object"
+    ? data.concentration_replaced
+    : null;
+
+  if (concentrationStarted && concentrationStarted.is_concentrating === true) {
+    lines.push(`Concentration: started on ${humanizeIdentifier(concentrationStarted.source_spell_id, "the active spell")}`);
+  }
+  if (concentrationReplaced && concentrationReplaced.source_spell_id) {
+    lines.push(`Concentration Replaced: ${humanizeIdentifier(concentrationReplaced.source_spell_id, concentrationReplaced.source_spell_id)}`);
+  }
+  if (concentrationResult) {
+    if (concentrationResult.concentration_broken === true) {
+      lines.push(`Concentration Check: broken at DC ${Number(concentrationResult.concentration_dc || 10)}`);
+    } else {
+      lines.push(`Concentration Check: held at DC ${Number(concentrationResult.concentration_dc || 10)}`);
+    }
+  }
+  return lines;
 }
 
 function getTradeById(data, tradeId) {
@@ -1563,7 +1697,7 @@ function buildTradeEmbed(data, userId) {
   return new EmbedBuilder()
     .setColor(0x3f7bd8)
     .setTitle("Broker Ledger")
-    .setDescription("Direct player trades")
+    .setDescription("Direct player trades • private exchange records for active delvers")
     .addFields(
       {
         name: "Pending Ledger",
@@ -1572,7 +1706,7 @@ function buildTradeEmbed(data, userId) {
             const counterparty = trade.role === "initiator"
               ? trade.counterparty_player_id
               : trade.initiator_player_id;
-            return `\`${cleanText(trade.trade_id, "trade")}\` • ${cleanText(trade.trade_state, "pending")} • with ${cleanText(counterparty, "unknown")}\nOffer: ${formatTradeOffer(trade.offered)}\nRequest: ${formatTradeOffer(trade.requested)}`;
+            return `\`${cleanText(trade.trade_id, "trade")}\` • ${cleanText(trade.trade_state, "pending")} • with ${cleanText(counterparty, "unknown")}\nOffer: ${formatTradeOffer(trade.offered)}\nRequest: ${formatTradeOffer(trade.requested)}\nBroker note: awaiting both hands on the bargain.`;
           }).join("\n\n")
           : "(no trades)",
         inline: false
@@ -1597,7 +1731,7 @@ function buildTradeDetailEmbed(data, trade, userId) {
   return new EmbedBuilder()
     .setColor(0x3f7bd8)
     .setTitle(`Broker Ledger | ${cleanText(safe.trade_id, "trade")}`)
-    .setDescription(`State: ${cleanText(safe.trade_state, "unknown")} • Role: ${role} • With: ${counterparty}`)
+    .setDescription(`State: ${cleanText(safe.trade_state, "unknown")} • Role: ${role} • With: ${counterparty} • broker seal pending`)
     .addFields(
       {
         name: "Offer",
@@ -2202,6 +2336,8 @@ function formatGatewayReplyFromRuntime(runtimeResult) {
     const knownSpellIds = character.spellbook && Array.isArray(character.spellbook.known_spell_ids)
       ? character.spellbook.known_spell_ids
       : [];
+    const feats = Array.isArray(character.feats) ? character.feats : [];
+    const featSlots = character.feat_slots && typeof character.feat_slots === "object" ? character.feat_slots : {};
     return {
       ok: true,
       embeds: [buildProfileEmbed(data)],
@@ -2216,9 +2352,42 @@ function formatGatewayReplyFromRuntime(runtimeResult) {
         `Level: ${Number.isFinite(Number(character.level)) ? Number(character.level) : 1}`,
         `XP: ${Number.isFinite(Number(character.xp)) ? Number(character.xp) : 0}`,
         `Known Spells: ${knownSpellIds.length}`,
+        `Feats: ${feats.length} (${summarizeFeatPreview(feats)})`,
+        `Feat Slots: ${Number.isFinite(Number(featSlots.used_slots)) ? Number(featSlots.used_slots) : 0}/${Number.isFinite(Number(featSlots.total_slots)) ? Number(featSlots.total_slots) : 0}${data.character && data.character.feat_available === true ? " • available" : ""}`,
         `Attunement: ${Number.isFinite(Number(attunement.slots_used)) ? Number(attunement.slots_used) : 0}/${Number.isFinite(Number(attunement.attunement_slots)) ? Number(attunement.attunement_slots) : 3}`,
         `Base Stats: ${character.base_stats ? formatStatLine(character.base_stats) : "unknown"}`,
         `Stats: ${character.stats ? formatStatLine(character.stats) : "unknown"}`
+      ].join("\n"),
+      data
+    };
+  }
+
+  if (responseType === "feat") {
+    const action = cleanText(data.action, "list");
+    const slots = data.feat_slots && typeof data.feat_slots === "object" ? data.feat_slots : {};
+    if (action === "take" && data.feat) {
+      const feat = data.feat || {};
+      return {
+        ok: true,
+        content: [
+          `Feat claimed: ${cleanText(feat.name, feat.feat_id || "unknown")}`,
+          cleanText(feat.description, "No feat description available."),
+          `Slots: ${Number.isFinite(Number(slots.used_slots)) ? Number(slots.used_slots) : 0}/${Number.isFinite(Number(slots.total_slots)) ? Number(slots.total_slots) : 0}`,
+          `Effects: ${Array.isArray(data.applied_effects) && data.applied_effects.length > 0 ? data.applied_effects.map((entry) => cleanText(entry.type, "effect")).join(", ") : "(none)"}`
+        ].join("\n"),
+        data
+      };
+    }
+
+    const feats = Array.isArray(data.feats) ? data.feats : [];
+    return {
+      ok: true,
+      content: [
+        `Available feats: ${feats.length}`,
+        `Slots: ${Number.isFinite(Number(slots.used_slots)) ? Number(slots.used_slots) : 0}/${Number.isFinite(Number(slots.total_slots)) ? Number(slots.total_slots) : 0}`,
+        feats.length > 0
+          ? feats.slice(0, 8).map((entry) => `- ${cleanText(entry.name, entry.feat_id || "unknown")}: ${cleanText(entry.description, "")}`).join("\n")
+          : "No feats available."
       ].join("\n"),
       data
     };
@@ -2372,6 +2541,7 @@ function formatGatewayReplyFromRuntime(runtimeResult) {
           `Healing: ${healingSummary}`,
           `Defense: ${defenseSummary}`,
           `Conditions: ${conditionSummary}`,
+          ...summarizeConcentrationUpdate(data),
           combatSummary ? `Round: ${Number.isFinite(Number(combatSummary.round)) ? Number(combatSummary.round) : 1}` : null,
           combatSummary ? `Participants: ${summarizeCombatParticipantsForReply(combatSummary)}` : null,
           `Next Turn: ${cleanText(data.active_participant_id, "(none)")}`,
@@ -2393,6 +2563,7 @@ function formatGatewayReplyFromRuntime(runtimeResult) {
         `Healing: ${healingSummary}`,
         `Defense: ${defenseSummary}`,
         `Conditions: ${conditionSummary}`,
+        ...summarizeConcentrationUpdate(data),
         `Next Turn: ${cleanText(data.active_participant_id, "(none)")}`,
         `AI Actions: ${summarizeAiTurns(data.ai_turns)}`,
         `Combat Ended: ${String(Boolean(data.combat_completed))}${data.winner_team ? " | Winner: " + data.winner_team : ""}`
@@ -2411,6 +2582,7 @@ function formatGatewayReplyFromRuntime(runtimeResult) {
           `Target: ${cleanText(data.target_id, "unknown")}`,
           `Result: ${summarizeAttackResult(data)}`,
           `Target HP After: ${data.target_hp_after === undefined ? "(unknown)" : String(data.target_hp_after)}`,
+          ...summarizeConcentrationUpdate(data),
           combatSummary ? `Round: ${Number.isFinite(Number(combatSummary.round)) ? Number(combatSummary.round) : 1}` : null,
           combatSummary ? `Participants: ${summarizeCombatParticipantsForReply(combatSummary)}` : null,
           `Next Turn: ${cleanText(data.active_participant_id, "(none)")}`,
@@ -2425,6 +2597,7 @@ function formatGatewayReplyFromRuntime(runtimeResult) {
         `Target: ${cleanText(data.target_id, "unknown")}`,
         `Result: ${summarizeAttackResult(data)}`,
         `Target HP After: ${data.target_hp_after === undefined ? "(unknown)" : String(data.target_hp_after)}`,
+        ...summarizeConcentrationUpdate(data),
         `Next Turn: ${cleanText(data.active_participant_id, "(none)")}`,
         `AI Actions: ${summarizeAiTurns(data.ai_turns)}`,
         `Combat Ended: ${String(Boolean(data.combat_completed))}${data.winner_team ? " | Winner: " + data.winner_team : ""}`

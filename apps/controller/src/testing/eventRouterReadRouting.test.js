@@ -326,6 +326,24 @@ function runEventRouterReadRoutingTests() {
     assert.equal(setup.queued[2].event_type, EVENT_TYPES.RUNTIME_WORLD_COMMAND_REQUESTED);
   }, results);
 
+  runTest("feat_event_routes_to_world_and_emits_world_dispatch_event", () => {
+    const router = new EventRouter();
+    const setup = createRouteContext();
+    const event = createEvent(EVENT_TYPES.PLAYER_FEAT_REQUESTED, {
+      action: "list"
+    }, {
+      source: "gateway.discord",
+      target_system: "world_system",
+      player_id: "player-router-feat-001"
+    });
+
+    const out = router.route(event, setup.context);
+    assert.equal(out.system, "world");
+    assert.equal(setup.queued.length, 1);
+    assert.equal(setup.queued[0].event_type, EVENT_TYPES.RUNTIME_WORLD_COMMAND_REQUESTED);
+    assert.equal(setup.queued[0].payload.request_event.event_type, EVENT_TYPES.PLAYER_FEAT_REQUESTED);
+  }, results);
+
   runTest("dungeon_enter_event_routes_to_session_and_emits_session_dispatch_event", () => {
     const router = new EventRouter();
     const setup = createRouteContext();

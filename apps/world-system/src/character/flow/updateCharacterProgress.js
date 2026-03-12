@@ -3,6 +3,8 @@
 const { defaultCharacterService } = require("../character.defaults");
 const { getClassData, getClassOptionData } = require("../rules/classRules");
 const { listSpellsForClass } = require("../rules/spellRules");
+const { getRemainingFeatSlots, isFeatSlotAvailable } = require("../rules/featRules");
+const { applyDerivedSavingThrowState } = require("../rules/saveRules");
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -218,6 +220,14 @@ function updateCharacterProgress(input) {
     progression: {
       subclass_unlock_level: subclassUnlockLevel,
       subclass_available: subclassAvailable,
+      feat_slots: getRemainingFeatSlots({
+        level: nextLevel,
+        feats: character.feats
+      }),
+      feat_available: isFeatSlotAvailable({
+        level: nextLevel,
+        feats: character.feats
+      }),
       updated_at: new Date().toISOString()
     },
     spell_progression: spellProgression
@@ -235,13 +245,21 @@ function updateCharacterProgress(input) {
   }
 
   return success("character_progress_updated", {
-    character: clone(updated.payload.character),
+    character: clone(applyDerivedSavingThrowState(updated.payload.character)),
     xp_delta: xpDelta,
     previous_xp: currentXp,
     current_xp: nextXp,
     previous_level: currentLevel,
     current_level: nextLevel,
     subclass_available: subclassAvailable,
+    feat_slots: getRemainingFeatSlots({
+      level: nextLevel,
+      feats: character.feats
+    }),
+    feat_available: isFeatSlotAvailable({
+      level: nextLevel,
+      feats: character.feats
+    }),
     spell_progression: spellProgression
   });
 }
@@ -289,7 +307,7 @@ function updateCharacterStats(input) {
   }
 
   return success("character_stats_updated", {
-    character: clone(updated.payload.character),
+    character: clone(applyDerivedSavingThrowState(updated.payload.character)),
     applied_stats_patch: clone(statsPatch)
   });
 }

@@ -35,6 +35,7 @@ function runCommandDefinitionsTests() {
     assert.equal(names.includes("identify"), true);
     assert.equal(names.includes("attune"), true);
     assert.equal(names.includes("unattune"), true);
+    assert.equal(names.includes("feat"), true);
     assert.equal(names.includes("dungeon"), true);
     assert.equal(names.includes("leave"), true);
     assert.equal(names.includes("interact"), true);
@@ -42,7 +43,7 @@ function runCommandDefinitionsTests() {
     assert.equal(names.includes("attack"), true);
     assert.equal(names.includes("cast"), true);
     assert.equal(names.includes("use"), true);
-    assert.equal(commandDefinitions.length >= 22, true);
+    assert.equal(commandDefinitions.length >= 23, true);
 
     const startDef = commandDefinitions.find(function findStart(def) {
       return def.name === "start";
@@ -72,6 +73,9 @@ function runCommandDefinitionsTests() {
     });
     const unattuneDef = commandDefinitions.find(function findUnattune(def) {
       return def.name === "unattune";
+    });
+    const featDef = commandDefinitions.find(function findFeat(def) {
+      return def.name === "feat";
     });
     const leaveDef = commandDefinitions.find(function findLeave(def) {
       return def.name === "leave";
@@ -106,6 +110,7 @@ function runCommandDefinitionsTests() {
     assert.equal(Boolean(identifyDef), true);
     assert.equal(Boolean(attuneDef), true);
     assert.equal(Boolean(unattuneDef), true);
+    assert.equal(Boolean(featDef), true);
     assert.equal(Boolean(leaveDef), true);
     assert.equal(Boolean(interactDef), true);
     assert.equal(Boolean(moveDef), true);
@@ -121,6 +126,7 @@ function runCommandDefinitionsTests() {
     assert.equal(Array.isArray(identifyDef.options), true);
     assert.equal(Array.isArray(attuneDef.options), true);
     assert.equal(Array.isArray(unattuneDef.options), true);
+    assert.equal(Array.isArray(featDef.options), true);
     assert.equal(Array.isArray(leaveDef.options), true);
     assert.equal(Array.isArray(interactDef.options), true);
     assert.equal(Array.isArray(moveDef.options), true);

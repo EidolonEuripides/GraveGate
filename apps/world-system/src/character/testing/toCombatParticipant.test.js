@@ -65,6 +65,7 @@ function runToCombatParticipantTests() {
         name: "Identity Hero",
         race_id: "human",
         class_id: "fighter",
+        feats: ["alert", "mobile"],
         stats: {
           strength: 16,
           dexterity: 12,
@@ -87,6 +88,12 @@ function runToCombatParticipantTests() {
             item_id: "item_chain_mail"
           }
         },
+        speed: 40,
+        metadata: {
+          feat_flags: {
+            war_caster: true
+          }
+        },
         hp_summary: {
           current: 21,
           max: 25
@@ -99,7 +106,10 @@ function runToCombatParticipantTests() {
     assert.equal(out.payload.participant.name, "Identity Hero");
     assert.equal(out.payload.participant.current_hp, 21);
     assert.equal(out.payload.participant.max_hp, 25);
+    assert.equal(out.payload.participant.movement_speed, 40);
     assert.equal(out.payload.participant.stats.strength, 16);
+    assert.equal(out.payload.participant.feats.length, 2);
+    assert.equal(out.payload.participant.feat_flags.war_caster, true);
     assert.equal(out.payload.participant.spellcasting_ability, "charisma");
     assert.equal(out.payload.participant.spellsave_dc, 13);
     assert.equal(out.payload.participant.spell_attack_bonus, 5);
@@ -108,6 +118,21 @@ function runToCombatParticipantTests() {
     assert.equal(out.payload.participant.readiness.class_id, "fighter");
     assert.equal(out.payload.participant.readiness.weapon_profile.item_id, "item_longsword");
     assert.equal(out.payload.participant.readiness.armor_profile.item_id, "item_chain_mail");
+  }, results);
+
+  runTest("saving_throw_fallback_reads_numeric_summary_when_explicit_fields_are_missing", () => {
+    const out = toCombatParticipant({
+      character: {
+        character_id: "char-adapter-save-001",
+        name: "Save Hero",
+        saving_throws: {
+          wisdom: 4
+        }
+      }
+    });
+
+    assert.equal(out.ok, true);
+    assert.equal(out.payload.participant.wisdom_save_modifier, 4);
   }, results);
 
   runTest("failure_on_invalid_character_input", () => {

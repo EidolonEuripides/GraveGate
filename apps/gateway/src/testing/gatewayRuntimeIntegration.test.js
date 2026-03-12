@@ -234,6 +234,9 @@ async function runGatewayRuntimeIntegrationTests() {
                       spellbook: {
                         known_spell_ids: ["fire_bolt", "light"]
                       },
+                      feats: [
+                        { feat_id: "alert", name: "Alert", description: "Init edge." }
+                      ],
                       attunement: {
                         attunement_slots: 3,
                         slots_used: 1,
@@ -287,6 +290,58 @@ async function runGatewayRuntimeIntegrationTests() {
     assert.equal(interaction._replyCalls[0].embeds[0].data.fields.some((field) => field.name === "Combat Core" && String(field.value).includes("HP: 38/42 (+5 temp)")), true);
     assert.equal(interaction._replyCalls[0].embeds[0].data.fields.some((field) => field.name === "Saving Throws" && String(field.value).includes("STR +5")), true);
     assert.equal(interaction._replyCalls[0].embeds[0].data.fields.some((field) => field.name === "Origin" && String(field.value).includes("soldier")), true);
+  }, results);
+
+  await runTest("gateway_routes_feat_command_to_runtime_path", async () => {
+    let receivedEvent = null;
+    const runtime = {
+      processGatewayReadCommandEvent(event) {
+        receivedEvent = event;
+        return {
+          ok: true,
+          event_type: "read_command_runtime_completed",
+          payload: {
+            responses: [
+              {
+                event_type: "gateway_response_ready",
+                payload: {
+                  response_type: "feat",
+                  ok: true,
+                  data: {
+                    action: "take",
+                    feat: {
+                      feat_id: "alert",
+                      name: "Alert",
+                      description: "Init edge."
+                    },
+                    feat_slots: {
+                      total_slots: 1,
+                      used_slots: 1
+                    },
+                    applied_effects: [
+                      { type: "initiative_bonus" }
+                    ]
+                  },
+                  error: null
+                }
+              }
+            ],
+            events_processed: [event],
+            final_state: {}
+          },
+          error: null
+        };
+      }
+    };
+
+    const interaction = createInteraction("feat", [{ name: "action", value: "take" }, { name: "feat_id", value: "alert" }], "player-gateway-feat-001");
+    const out = await handleGatewayInteraction(interaction, runtime);
+
+    assert.equal(out.ok, true);
+    assert.equal(Boolean(receivedEvent), true);
+    assert.equal(receivedEvent.event_type, "player_feat_requested");
+    assert.equal(interaction._replyCalls.length, 1);
+    assert.equal(String(interaction._replyCalls[0].content).includes("Feat claimed: Alert"), true);
   }, results);
 
   await runTest("gateway_profile_button_opens_inventory_viewer", async () => {
@@ -1683,7 +1738,7 @@ async function runGatewayRuntimeIntegrationTests() {
     assert.equal(objectButton._updateCalls.length, 1);
     assert.equal(String(objectButton._updateCalls[0].content).includes("Object: Bronze Door"), true);
     assert.equal(String(objectButton._updateCalls[0].content).includes("Action: open"), true);
-    assert.equal(String(objectButton._updateCalls[0].content).includes("Spell Effect: knock"), true);
+    assert.equal(String(objectButton._updateCalls[0].content).includes("Spell Effect: Knock"), true);
     assert.equal(String(objectButton._updateCalls[0].content).includes("Check: investigation passed (15 vs DC 12)"), true);
     assert.equal(String(objectButton._updateCalls[0].content).includes("Mechanism: opened obj-door-002"), true);
   }, results);

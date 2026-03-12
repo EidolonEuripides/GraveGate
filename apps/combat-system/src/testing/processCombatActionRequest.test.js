@@ -22,6 +22,18 @@ function runTest(name, fn, results) {
   }
 }
 
+function createSpellProvider(spells) {
+  const entries = Array.isArray(spells) ? JSON.parse(JSON.stringify(spells)) : [];
+  return function provideSpells() {
+    return {
+      ok: true,
+      payload: {
+        spells: JSON.parse(JSON.stringify(entries))
+      }
+    };
+  };
+}
+
 class FakeSqliteDb {
   constructor() {
     this.tables = new Map();
@@ -803,6 +815,66 @@ function runProcessCombatActionRequestTests() {
 
     assert.equal(out.ok, true);
     assert.equal(out.payload.reactions.opportunity_attacks.length, 0);
+  }, results);
+
+  runTest("war_caster_can_replace_opportunity_attack_with_single_target_spell", () => {
+    const playerId = "player-combat-move-war-caster-001";
+    const combatId = "combat-move-war-caster-001";
+    const manager = createCombatReadyForMove(combatId, playerId);
+    const loaded = manager.getCombatById(combatId);
+    const combat = loaded.payload.combat;
+    const reactor = combat.participants.find((entry) => entry.participant_id === "enemy-reactor-001");
+    reactor.spellbook = {
+      known_spell_ids: ["shocking_grasp"]
+    };
+    reactor.spellcasting_ability = "charisma";
+    reactor.spell_attack_bonus = 5;
+    reactor.feat_flags = {
+      war_caster: true
+    };
+    reactor.stats = {
+      charisma: 16
+    };
+    manager.combats.set(combatId, combat);
+
+    const out = processCombatMoveRequest({
+      context: {
+        combatManager: manager,
+        loadContentBundle: createSpellProvider([{
+          spell_id: "shocking_grasp",
+          name: "Shocking Grasp",
+          casting_time: "1 action",
+          range: "5 feet",
+          targeting: { type: "single_target" },
+          attack_or_save: { type: "spell_attack" },
+          damage: { dice: "1d8", damage_type: "lightning" },
+          effect: { status_hint: "no_reaction_until_next_turn" }
+        }]),
+        warCasterOpportunitySpellSelector() {
+          return "shocking_grasp";
+        },
+        spellAttackRollFn: () => ({ final_total: 18 }),
+        opportunityAttackDamageRollFn: () => 0
+      },
+      player_id: playerId,
+      combat_id: combatId,
+      payload: {
+        target_x: 0,
+        target_y: 1
+      }
+    });
+
+    assert.equal(out.ok, true);
+    assert.equal(out.payload.reactions.opportunity_attacks.length, 1);
+    assert.equal(out.payload.reactions.opportunity_attacks[0].resolution_kind, "spell");
+    assert.equal(out.payload.reactions.opportunity_attacks[0].spell_id, "shocking_grasp");
+
+    const updated = manager.getCombatById(combatId).payload.combat;
+    const updatedReactor = updated.participants.find((entry) => entry.participant_id === "enemy-reactor-001");
+    const mover = updated.participants.find((entry) => entry.participant_id === playerId);
+    assert.equal(updatedReactor.reaction_available, true);
+    assert.equal(mover.current_hp, 9);
+    assert.equal(updated.event_log.some((entry) => entry.event_type === "cast_spell_action" && entry.war_caster_reaction === true), true);
   }, results);
 
   runTest("no_opportunity_attack_from_dead_or_stunned_reactor", () => {

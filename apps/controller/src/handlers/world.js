@@ -2,6 +2,8 @@
 
 const { EVENT_TYPES } = require("../../../../packages/shared-types");
 const { handleWorldEventByType } = require("../../../world-system/src");
+const { getRemainingFeatSlots, isFeatSlotAvailable } = require("../../../world-system/src/character/rules/featRules");
+const { deriveSavingThrowState } = require("../../../world-system/src/character/rules/saveRules");
 const { createGatewayResponseEvent, createRuntimeDispatchEvent } = require("./shared");
 
 function loadCharactersForStart(context) {
@@ -101,6 +103,50 @@ function cleanItemSummary(entry) {
   };
 }
 
+function resolveFeatIndex(context) {
+  if (!context || typeof context.loadContentBundle !== "function") {
+    return {};
+  }
+  const loaded = context.loadContentBundle();
+  if (!loaded || loaded.ok !== true) {
+    return {};
+  }
+  const content = loaded.payload && loaded.payload.content ? loaded.payload.content : {};
+  const feats = Array.isArray(content.feats) ? content.feats : [];
+  return feats.reduce((index, entry) => {
+    const featId = String(entry && entry.feat_id || "").trim().toLowerCase();
+    if (featId) {
+      index[featId] = entry;
+    }
+    return index;
+  }, {});
+}
+
+function summarizeCharacterFeats(context, character) {
+  const featIds = Array.isArray(character && character.feats) ? character.feats : [];
+  const featIndex = resolveFeatIndex(context);
+  return featIds
+    .map((entry) => String(entry || "").trim().toLowerCase())
+    .filter(Boolean)
+    .map((featId) => {
+      const feat = featIndex[featId] || null;
+      return {
+        feat_id: featId,
+        name: feat && feat.name ? String(feat.name) : featId,
+        description: feat && feat.description ? String(feat.description) : null
+      };
+    });
+}
+
+function resolveCharacterSavingThrows(character) {
+  const savingThrows = character && character.saving_throws && typeof character.saving_throws === "object"
+    ? character.saving_throws
+    : {};
+  const hasNumericSummary = ["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"]
+    .some((key) => Number.isFinite(Number(savingThrows[key])));
+  return hasNumericSummary ? savingThrows : deriveSavingThrowState(character).saving_throws;
+}
+
 function handleWorldEvent(event, context) {
   if (event.event_type === EVENT_TYPES.PLAYER_START_REQUESTED) {
     return [createRuntimeDispatchEvent(event, EVENT_TYPES.RUNTIME_WORLD_COMMAND_REQUESTED, "world_system")];
@@ -121,6 +167,9 @@ function handleWorldEvent(event, context) {
     return [createRuntimeDispatchEvent(event, EVENT_TYPES.RUNTIME_WORLD_COMMAND_REQUESTED, "world_system")];
   }
   if (event.event_type === EVENT_TYPES.PLAYER_UNATTUNE_ITEM_REQUESTED) {
+    return [createRuntimeDispatchEvent(event, EVENT_TYPES.RUNTIME_WORLD_COMMAND_REQUESTED, "world_system")];
+  }
+  if (event.event_type === EVENT_TYPES.PLAYER_FEAT_REQUESTED) {
     return [createRuntimeDispatchEvent(event, EVENT_TYPES.RUNTIME_WORLD_COMMAND_REQUESTED, "world_system")];
   }
 
@@ -179,8 +228,11 @@ function handleWorldEvent(event, context) {
           speed: Number.isFinite(Number(found.speed)) ? Number(found.speed) : 30,
           spellcasting_ability: found.spellcasting_ability || null,
           spellsave_dc: Number.isFinite(Number(found.spellsave_dc)) ? Number(found.spellsave_dc) : null,
-          saving_throws: found.saving_throws || {},
+          saving_throws: resolveCharacterSavingThrows(found),
           skills: found.skills || {},
+          feats: summarizeCharacterFeats(context, found),
+          feat_slots: getRemainingFeatSlots(found),
+          feat_available: isFeatSlotAvailable(found),
           attunement: found.attunement || { attunement_slots: 3, slots_used: 0, attuned_items: [] },
           spellbook: found.spellbook || {}
         }

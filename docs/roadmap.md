@@ -50,7 +50,14 @@ Current immediate build direction:
 - [x] Gestalt start foundation
 - [~] Gestalt progression long-term rules
 - [~] Level-up progression depth
-- [ ] Feats system
+- [~] Feats system
+  - Canonical `/feat` list/take path is in
+  - Profile now surfaces feat summaries and feat-slot availability
+  - Passive-safe feats currently applied live: `alert`, `tough`, `mobile`
+  - `resilient` now applies the chosen ability increase and saving throw proficiency through the canonical character/progression path
+  - Spellcasting prerequisite validation is in for `war_caster`
+  - `war_caster` now applies advantage on concentration saves through the canonical combat concentration path
+  - `war_caster` now has backend support to replace an opportunity attack with a valid single-target spell on the canonical OA path; player-facing choice UI is still pending
 - [ ] Full char sheet screen/output
 - [ ] Skills system as full gameplay-facing layer
 - [ ] Flavor-rich progression text layer
@@ -89,7 +96,7 @@ Current immediate build direction:
 - [x] Initial spell pipeline
 - [x] Core action and movement resource consumption
 - [x] Spellcasting starter slice
-- [~] Concentration support foundations
+- [x] Concentration support foundations
 - [x] AI monster control foundation
 - [ ] Full D&D spell engine
 - [~] Utility spell gameplay integration
@@ -304,3 +311,6 @@ Current immediate build direction:
 - [x] Added canonical `/combat` read path with refreshable battle-state view
 - [x] Added multi-action dungeon object buttons for common room objects
 - [x] Tightened combat state readout into a per-participant roster summary
+- [x] Added canonical combat concentration tracking and break handling for supported spell and damage flows
+- [x] Added starter feat framework with canonical `/feat` list/take flow and profile readback
+- [x] Added feat-slot progression visibility and feat-derived combat adapter state for passive-safe feats

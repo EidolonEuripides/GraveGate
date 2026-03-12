@@ -241,6 +241,92 @@ function runAttackActionTests() {
     assert.equal(out.payload.combat.conditions.length, 0);
   }, results);
 
+  runTest("damaging_a_concentrating_target_can_break_concentration", () => {
+    const manager = createActiveCombatForAttackTests();
+    const found = manager.getCombatById("combat-attack-001");
+    const combat = found.payload.combat;
+    const target = combat.participants.find((p) => p.participant_id === "target-001");
+    target.constitution_save_modifier = 0;
+    target.concentration = {
+      is_concentrating: true,
+      source_spell_id: "shield_of_faith",
+      target_actor_id: "target-001",
+      linked_condition_ids: ["condition-concentration-001"],
+      linked_restorations: [],
+      started_at_round: 1,
+      broken_reason: null
+    };
+    combat.conditions = [{
+      condition_id: "condition-concentration-001",
+      condition_type: "shield_of_faith",
+      source_actor_id: "target-001",
+      target_actor_id: "target-001",
+      expiration_trigger: "manual",
+      metadata: {}
+    }];
+    manager.combats.set("combat-attack-001", combat);
+
+    const out = performAttackAction({
+      combatManager: manager,
+      combat_id: "combat-attack-001",
+      attacker_id: "attacker-001",
+      target_id: "target-001",
+      attack_roll_fn: () => 18,
+      damage_roll_fn: () => 8,
+      concentration_save_rng: () => 0
+    });
+
+    assert.equal(out.ok, true);
+    assert.equal(Boolean(out.payload.concentration_result), true);
+    assert.equal(out.payload.concentration_result.concentration_broken, true);
+    assert.equal(out.payload.combat.conditions.length, 0);
+    const updatedTarget = out.payload.combat.participants.find((entry) => entry.participant_id === "target-001");
+    assert.equal(updatedTarget.concentration.is_concentrating, false);
+  }, results);
+
+  runTest("successful_concentration_save_keeps_concentration_active", () => {
+    const manager = createActiveCombatForAttackTests();
+    const found = manager.getCombatById("combat-attack-001");
+    const combat = found.payload.combat;
+    const target = combat.participants.find((p) => p.participant_id === "target-001");
+    target.constitution_save_modifier = 5;
+    target.concentration = {
+      is_concentrating: true,
+      source_spell_id: "shield_of_faith",
+      target_actor_id: "target-001",
+      linked_condition_ids: ["condition-concentration-002"],
+      linked_restorations: [],
+      started_at_round: 1,
+      broken_reason: null
+    };
+    combat.conditions = [{
+      condition_id: "condition-concentration-002",
+      condition_type: "shield_of_faith",
+      source_actor_id: "target-001",
+      target_actor_id: "target-001",
+      expiration_trigger: "manual",
+      metadata: {}
+    }];
+    manager.combats.set("combat-attack-001", combat);
+
+    const out = performAttackAction({
+      combatManager: manager,
+      combat_id: "combat-attack-001",
+      attacker_id: "attacker-001",
+      target_id: "target-001",
+      attack_roll_fn: () => 18,
+      damage_roll_fn: () => 4,
+      concentration_save_rng: () => 18
+    });
+
+    assert.equal(out.ok, true);
+    assert.equal(Boolean(out.payload.concentration_result), true);
+    assert.equal(out.payload.concentration_result.concentration_broken, false);
+    assert.equal(out.payload.combat.conditions.length, 1);
+    const updatedTarget = out.payload.combat.participants.find((entry) => entry.participant_id === "target-001");
+    assert.equal(updatedTarget.concentration.is_concentrating, true);
+  }, results);
+
   runTest("defeated_participant_cannot_attack", () => {
     const manager = createActiveCombatForAttackTests();
     const found = manager.getCombatById("combat-attack-001");

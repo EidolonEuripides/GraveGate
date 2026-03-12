@@ -101,6 +101,16 @@ const CONTENT_SCHEMAS = {
       metadata: isObject
     }
   },
+  feat: {
+    required: {
+      feat_id: isString,
+      name: isString,
+      description: isString,
+      prerequisites: isObject,
+      effects: isArray,
+      metadata: isObject
+    }
+  },
   dungeon: {
     required: {
       dungeon_id: isString,

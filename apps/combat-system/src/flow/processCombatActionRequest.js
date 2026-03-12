@@ -401,7 +401,8 @@ function processCombatAttackRequest(input) {
     combatManager: context.combatManager,
     combat_id: String(combatId),
     attacker_id: controlled.payload.participant_id,
-    target_id: payload.target_id
+    target_id: payload.target_id,
+    concentration_save_rng: context.concentrationSaveRng
   });
   if (!out.ok) {
     return failure("player_attack_failed", out.error || "attack action failed", out.payload);
@@ -466,13 +467,22 @@ function processCombatMoveRequest(input) {
   }
 
   const opportunityAttacks = resolveOpportunityAttacksForMove({
+    combatManager: context.combatManager,
+    combat_id: String(combatId),
     combat: out.payload.combat,
     mover_id: controlled.payload.participant_id,
     from_position: out.payload.from_position,
     to_position: out.payload.to_position,
     voluntary_movement: true,
     attack_roll_fn: context.opportunityAttackAttackRollFn,
-    damage_roll_fn: context.opportunityAttackDamageRollFn
+    damage_roll_fn: context.opportunityAttackDamageRollFn,
+    spell_attack_roll_fn: context.spellAttackRollFn,
+    spell_saving_throw_fn: context.spellSavingThrowFn,
+    concentration_save_rng: context.concentrationSaveRng,
+    war_caster_spell_selector: context.warCasterOpportunitySpellSelector,
+    load_spell_fn(spellId) {
+      return loadSpellDefinitionFromContext(context, spellId);
+    }
   });
   if (!opportunityAttacks.ok) {
     return failure("player_move_failed", opportunityAttacks.error || "opportunity attack resolution failed", opportunityAttacks.payload);
@@ -673,7 +683,8 @@ function processCombatCastSpellRequest(input) {
     attack_roll_rng: context.spellAttackRollRng,
     saving_throw_fn: context.spellSavingThrowFn,
     damage_rng: context.spellDamageRng,
-    healing_rng: context.spellHealingRng
+    healing_rng: context.spellHealingRng,
+    concentration_save_rng: context.concentrationSaveRng
   });
   if (!out.ok) {
     return failure("player_cast_failed", out.error || "cast spell action failed", out.payload);

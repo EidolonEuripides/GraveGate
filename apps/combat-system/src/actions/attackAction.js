@@ -10,6 +10,7 @@ const {
   participantHasCondition,
   removeConditionFromCombatState
 } = require("../conditions/conditionHelpers");
+const { resolveConcentrationDamageCheck } = require("../concentration/concentrationState");
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -221,6 +222,7 @@ function resolveAttackAgainstCombatState(input) {
   }
 
   let damageDealt = 0;
+  let concentrationResult = null;
   if (hit) {
     const rawDamage = Number(damageRollFn(attacker, target, combat));
     if (!Number.isFinite(rawDamage)) {
@@ -230,6 +232,12 @@ function resolveAttackAgainstCombatState(input) {
 
     const targetCurrentHp = Number.isFinite(target.current_hp) ? target.current_hp : 0;
     target.current_hp = Math.max(0, targetCurrentHp - damageDealt);
+    const concentrationCheck = resolveConcentrationDamageCheck(updatedCombat, targetId, damageDealt, data.concentration_save_rng);
+    if (!concentrationCheck.ok) {
+      return failure("attack_action_failed", concentrationCheck.error || "failed to resolve concentration check");
+    }
+    updatedCombat = concentrationCheck.next_state;
+    concentrationResult = concentrationCheck.concentration_result || null;
   }
   if (!reactionMode) {
     const attackerIndex = participants.findIndex((entry) => String(entry.participant_id || "") === String(attackerId));
@@ -258,7 +266,8 @@ function resolveAttackAgainstCombatState(input) {
     damage_dealt: damageDealt,
     target_hp_after: target.current_hp,
     reaction_mode: reactionMode,
-    consumed_target_condition_type: attackRollResult.consumed_target_condition_type || null
+    consumed_target_condition_type: attackRollResult.consumed_target_condition_type || null,
+    concentration_result: clone(concentrationResult)
   });
   updatedCombat.updated_at = new Date().toISOString();
 
@@ -275,6 +284,7 @@ function resolveAttackAgainstCombatState(input) {
     target_armor_class: targetArmorClass,
     damage_dealt: damageDealt,
     target_hp_after: target.current_hp,
+    concentration_result: clone(concentrationResult),
     combat: clone(updatedCombat)
   });
 }
@@ -310,7 +320,8 @@ function performAttackAction(input) {
     attacker_id: attackerId,
     target_id: targetId,
     attack_roll_fn: data.attack_roll_fn,
-    damage_roll_fn: data.damage_roll_fn
+    damage_roll_fn: data.damage_roll_fn,
+    concentration_save_rng: data.concentration_save_rng
   });
   if (!out.ok) {
     return out;

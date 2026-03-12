@@ -4,6 +4,20 @@ function toNumberOrDefault(value, fallback) {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
+function resolveSaveModifier(character, abilityId) {
+  const explicit = character && typeof character === "object"
+    ? character[abilityId + "_save_modifier"]
+    : undefined;
+  if (typeof explicit === "number" && Number.isFinite(explicit)) {
+    return explicit;
+  }
+  const savingThrows = character && character.saving_throws && typeof character.saving_throws === "object"
+    ? character.saving_throws
+    : {};
+  const fallback = savingThrows[abilityId];
+  return typeof fallback === "number" && Number.isFinite(fallback) ? fallback : null;
+}
+
 function toObjectOrDefault(value, fallback) {
   if (value && typeof value === "object" && !Array.isArray(value)) {
     return value;
@@ -74,18 +88,21 @@ function toCombatParticipant(input) {
     attack_bonus: toNumberOrDefault(input.attack_bonus, toNumberOrDefault(character.attack_bonus, 0)),
     damage: toNumberOrDefault(input.damage, toNumberOrDefault(character.damage, 1)),
     position: buildPosition(input.position, character.position),
+    movement_speed: toNumberOrDefault(character.speed, 30),
     stats: toObjectOrDefault(character.stats, {}),
+    feats: toArrayOrDefault(character.feats, []),
+    feat_flags: toObjectOrDefault(character.metadata && character.metadata.feat_flags, {}),
     spellbook: toObjectOrDefault(character.spellbook, null),
     spellcasting_ability: character.spellcasting_ability || null,
     spellsave_dc: toNumberOrDefault(character.spellsave_dc, null),
     spell_attack_bonus: toNumberOrDefault(character.spell_attack_bonus, null),
     proficiency_bonus: toNumberOrDefault(character.proficiency_bonus, null),
-    strength_save_modifier: toNumberOrDefault(character.strength_save_modifier, null),
-    dexterity_save_modifier: toNumberOrDefault(character.dexterity_save_modifier, null),
-    constitution_save_modifier: toNumberOrDefault(character.constitution_save_modifier, null),
-    intelligence_save_modifier: toNumberOrDefault(character.intelligence_save_modifier, null),
-    wisdom_save_modifier: toNumberOrDefault(character.wisdom_save_modifier, null),
-    charisma_save_modifier: toNumberOrDefault(character.charisma_save_modifier, null),
+    strength_save_modifier: resolveSaveModifier(character, "strength"),
+    dexterity_save_modifier: resolveSaveModifier(character, "dexterity"),
+    constitution_save_modifier: resolveSaveModifier(character, "constitution"),
+    intelligence_save_modifier: resolveSaveModifier(character, "intelligence"),
+    wisdom_save_modifier: resolveSaveModifier(character, "wisdom"),
+    charisma_save_modifier: resolveSaveModifier(character, "charisma"),
     vulnerabilities: toArrayOrDefault(character.vulnerabilities, []),
     resistances: toArrayOrDefault(character.resistances, []),
     immunities: toArrayOrDefault(character.immunities, []),

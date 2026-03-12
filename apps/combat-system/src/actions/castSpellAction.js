@@ -5,6 +5,10 @@ const { participantHasCondition, applyConditionToCombatState } = require("../con
 const { applyDamageToCombatState } = require("../damage/apply-damage-to-combat-state");
 const { DAMAGE_TYPES, isSupportedDamageType, normalizeDamageType } = require("../damage/damage-types");
 const {
+  startParticipantConcentration,
+  resolveConcentrationDamageCheck
+} = require("../concentration/concentrationState");
+const {
   computeSpellAttackBonus,
   computeSpellSaveDc,
   parseSpellRangeFeet,
@@ -42,6 +46,19 @@ function failure(eventType, message, payload) {
 
 function findParticipantById(participants, participantId) {
   return participants.find((entry) => String(entry.participant_id || "") === String(participantId || "")) || null;
+}
+
+function participantHasFeatFlag(participant, flagKey) {
+  const key = String(flagKey || "").trim();
+  if (!key || !participant || typeof participant !== "object") {
+    return false;
+  }
+  const featFlags = participant.feat_flags && typeof participant.feat_flags === "object"
+    ? participant.feat_flags
+    : participant.metadata && participant.metadata.feat_flags && typeof participant.metadata.feat_flags === "object"
+      ? participant.metadata.feat_flags
+      : {};
+  return featFlags[key] === true;
 }
 
 function ensureParticipantCanCast(combat, caster, actionCost) {
@@ -361,6 +378,43 @@ function resolveDefenseEffect(combat, spell, targetId, casterId) {
     });
   }
 
+  if (defenseRef === "spell_shield_of_faith_ac_bonus") {
+    const acBonus = Number.isFinite(Number(effect.ac_bonus)) ? Number(effect.ac_bonus) : 2;
+    const beforeAc = Number.isFinite(target.armor_class) ? Number(target.armor_class) : 10;
+    target.armor_class = beforeAc + acBonus;
+    const conditionOut = resolveAppliedConditions(nextCombat, {
+      effect: {
+        applied_conditions: [{
+          condition_type: "shield_of_faith",
+          expiration_trigger: "manual",
+          metadata: {
+            armor_class_before: beforeAc,
+            armor_class_after: target.armor_class,
+            armor_class_bonus: acBonus,
+            source_spell_id: spell.spell_id || spell.id || null
+          }
+        }]
+      }
+    }, casterId, targetId, true);
+    if (!conditionOut.ok) {
+      return conditionOut;
+    }
+    return success("spell_defense_effect_applied", {
+      next_combat: clone(conditionOut.payload.next_combat),
+      defense_result: {
+        defense_ref: defenseRef,
+        armor_class_before: beforeAc,
+        armor_class_after: target.armor_class,
+        concentration_restorations: [{
+          type: "armor_class_delta",
+          target_actor_id: String(targetId || ""),
+          delta: -acBonus
+        }]
+      },
+      applied_conditions: clone(conditionOut.payload.applied_conditions)
+    });
+  }
+
   return failure("cast_spell_action_failed", "spell defense effect is not supported yet", {
     defense_ref: defenseRef,
     spell_id: spell.spell_id || spell.id || null
@@ -374,6 +428,9 @@ function performCastSpellAction(input) {
   const casterId = data.caster_id;
   const spell = data.spell;
   const spellId = spell && (spell.spell_id || spell.id);
+  const reactionMode = data.reaction_mode === true;
+  const skipTurnValidation = data.skip_turn_validation === true;
+  const warCasterReaction = data.war_caster_reaction === true;
   const targetId = normalizeTargetParticipantId(casterId, spell, data.target_id);
 
   if (!combatManager) {
@@ -423,8 +480,34 @@ function performCastSpellAction(input) {
     });
   }
 
-  const actionCost = resolveSpellActionCost(spell);
-  if (actionCost === "reaction") {
+  const baseActionCost = resolveSpellActionCost(spell);
+  let actionCost = baseActionCost;
+  if (warCasterReaction) {
+    if (!reactionMode) {
+      return failure("cast_spell_action_failed", "war caster reaction requires reaction mode", {
+        spell_id: String(spellId)
+      });
+    }
+    if (!participantHasFeatFlag(caster, "war_caster")) {
+      return failure("cast_spell_action_failed", "war caster feat is required for reaction spell substitution", {
+        spell_id: String(spellId),
+        caster_id: String(casterId)
+      });
+    }
+    if (baseActionCost !== "action") {
+      return failure("cast_spell_action_failed", "war caster reaction requires a 1 action spell", {
+        spell_id: String(spellId),
+        action_cost: baseActionCost
+      });
+    }
+    if (getSpellTargetType(spell) !== "single_target") {
+      return failure("cast_spell_action_failed", "war caster reaction requires a single target spell", {
+        spell_id: String(spellId),
+        target_type: getSpellTargetType(spell)
+      });
+    }
+    actionCost = "reaction";
+  } else if (actionCost === "reaction") {
     return failure("cast_spell_action_failed", "reaction spell casting is not supported in this phase", {
       spell_id: String(spellId)
     });
@@ -435,15 +518,17 @@ function performCastSpellAction(input) {
     return actorValidation;
   }
 
-  const initiativeOrder = Array.isArray(combat.initiative_order) ? combat.initiative_order : [];
-  const expectedActorId = initiativeOrder[combat.turn_index];
-  if (!expectedActorId || String(expectedActorId) !== String(casterId)) {
-    return failure("cast_spell_action_failed", "it is not the caster's turn", {
-      combat_id: String(combatId),
-      caster_id: String(casterId),
-      expected_actor_id: expectedActorId || null,
-      turn_index: combat.turn_index
-    });
+  if (!skipTurnValidation) {
+    const initiativeOrder = Array.isArray(combat.initiative_order) ? combat.initiative_order : [];
+    const expectedActorId = initiativeOrder[combat.turn_index];
+    if (!expectedActorId || String(expectedActorId) !== String(casterId)) {
+      return failure("cast_spell_action_failed", "it is not the caster's turn", {
+        combat_id: String(combatId),
+        caster_id: String(casterId),
+        expected_actor_id: expectedActorId || null,
+        turn_index: combat.turn_index
+      });
+    }
   }
 
   const target = findParticipantById(combat.participants || [], targetId);
@@ -468,6 +553,7 @@ function performCastSpellAction(input) {
     : { type: "none" };
   const resolutionType = String(attackOrSave.type || "none");
   const configuredDamageType = resolveConfiguredSpellDamageType(spell, data.damage_type);
+  const concentrationRequired = spell && spell.concentration === true;
   let resolutionPayload = {
     attack_roll: null,
     attack_total: null,
@@ -478,7 +564,10 @@ function performCastSpellAction(input) {
     damage_result: null,
     healing_result: null,
     defense_result: null,
-    applied_conditions: []
+    applied_conditions: [],
+    concentration_result: null,
+    concentration_started: null,
+    concentration_replaced: null
   };
 
   if (resolutionType === "spell_attack") {
@@ -515,6 +604,17 @@ function performCastSpellAction(input) {
       }
       combat = clone(damageApplied.payload.next_combat);
       resolutionPayload.damage_result = clone(damageApplied.payload.damage_result);
+      const concentrationCheck = resolveConcentrationDamageCheck(
+        combat,
+        targetId,
+        resolutionPayload.damage_result.final_damage,
+        data.concentration_save_rng
+      );
+      if (!concentrationCheck.ok) {
+        return failure("cast_spell_action_failed", concentrationCheck.error || "failed to resolve concentration check");
+      }
+      combat = clone(concentrationCheck.next_state);
+      resolutionPayload.concentration_result = clone(concentrationCheck.concentration_result);
     }
 
     const conditionsApplied = resolveAppliedConditions(combat, spell, casterId, targetId, hit);
@@ -551,6 +651,17 @@ function performCastSpellAction(input) {
       }
       combat = clone(damageApplied.payload.next_combat);
       resolutionPayload.damage_result = clone(damageApplied.payload.damage_result);
+      const concentrationCheck = resolveConcentrationDamageCheck(
+        combat,
+        targetId,
+        resolutionPayload.damage_result.final_damage,
+        data.concentration_save_rng
+      );
+      if (!concentrationCheck.ok) {
+        return failure("cast_spell_action_failed", concentrationCheck.error || "failed to resolve concentration check");
+      }
+      combat = clone(concentrationCheck.next_state);
+      resolutionPayload.concentration_result = clone(concentrationCheck.concentration_result);
     }
 
     const onSave = String(spell.save_outcome || "none").toLowerCase();
@@ -579,6 +690,17 @@ function performCastSpellAction(input) {
         hp_before: hpBeforeHalf,
         hp_after: currentTarget.current_hp
       });
+      const concentrationCheck = resolveConcentrationDamageCheck(
+        combat,
+        targetId,
+        resolutionPayload.damage_result.final_damage,
+        data.concentration_save_rng
+      );
+      if (!concentrationCheck.ok) {
+        return failure("cast_spell_action_failed", concentrationCheck.error || "failed to resolve concentration check");
+      }
+      combat = clone(concentrationCheck.next_state);
+      resolutionPayload.concentration_result = clone(concentrationCheck.concentration_result);
     }
 
     const conditionsApplied = resolveAppliedConditions(combat, spell, casterId, targetId, !saveOut.payload.success);
@@ -602,6 +724,17 @@ function performCastSpellAction(input) {
       }
       combat = clone(damageApplied.payload.next_combat);
       resolutionPayload.damage_result = clone(damageApplied.payload.damage_result);
+      const concentrationCheck = resolveConcentrationDamageCheck(
+        combat,
+        targetId,
+        resolutionPayload.damage_result.final_damage,
+        data.concentration_save_rng
+      );
+      if (!concentrationCheck.ok) {
+        return failure("cast_spell_action_failed", concentrationCheck.error || "failed to resolve concentration check");
+      }
+      combat = clone(concentrationCheck.next_state);
+      resolutionPayload.concentration_result = clone(concentrationCheck.concentration_result);
     }
 
     const conditionsApplied = resolveAppliedConditions(combat, spell, casterId, targetId, true);
@@ -637,6 +770,27 @@ function performCastSpellAction(input) {
     });
   }
 
+  if (concentrationRequired) {
+    const linkedRestorations = resolutionPayload.defense_result &&
+      Array.isArray(resolutionPayload.defense_result.concentration_restorations)
+      ? clone(resolutionPayload.defense_result.concentration_restorations)
+      : [];
+    const concentrationStart = startParticipantConcentration(combat, {
+      participant_id: casterId,
+      source_spell_id: spellId,
+      target_actor_id: targetId || null,
+      linked_condition_ids: resolutionPayload.applied_conditions.map((entry) => String(entry.condition_id || "")).filter(Boolean),
+      linked_restorations: linkedRestorations,
+      started_at_round: Number.isFinite(Number(combat.round)) ? Number(combat.round) : 1
+    });
+    if (!concentrationStart.ok) {
+      return failure("cast_spell_action_failed", concentrationStart.error || "failed to start concentration");
+    }
+    combat = clone(concentrationStart.next_state);
+    resolutionPayload.concentration_started = clone(concentrationStart.concentration);
+    resolutionPayload.concentration_replaced = clone(concentrationStart.replaced_concentration);
+  }
+
   combat.event_log = Array.isArray(combat.event_log) ? combat.event_log : [];
   combat.event_log.push({
     event_type: "cast_spell_action",
@@ -646,6 +800,8 @@ function performCastSpellAction(input) {
     spell_id: String(spellId),
     spell_name: spell.name || null,
     action_cost: actionCost,
+    reaction_mode: reactionMode,
+    war_caster_reaction: warCasterReaction,
     resolution_type: resolutionType,
     range: spell.range || null,
     target_type: getSpellTargetType(spell),
@@ -659,6 +815,10 @@ function performCastSpellAction(input) {
     healing_result: resolutionPayload.healing_result,
     defense_result: resolutionPayload.defense_result,
     applied_conditions: clone(resolutionPayload.applied_conditions),
+    concentration_required: concentrationRequired,
+    concentration_result: clone(resolutionPayload.concentration_result),
+    concentration_started: clone(resolutionPayload.concentration_started),
+    concentration_replaced: clone(resolutionPayload.concentration_replaced),
     damage_type: resolutionPayload.damage_result
       ? resolutionPayload.damage_result.damage_type
       : (configuredDamageType || null)
@@ -673,6 +833,8 @@ function performCastSpellAction(input) {
     spell_id: String(spellId),
     spell_name: spell.name || null,
     action_cost: actionCost,
+    reaction_mode: reactionMode,
+    war_caster_reaction: warCasterReaction,
     resolution_type: resolutionType,
     damage_type: resolutionPayload.damage_result
       ? resolutionPayload.damage_result.damage_type
@@ -687,6 +849,10 @@ function performCastSpellAction(input) {
     healing_result: resolutionPayload.healing_result,
     defense_result: resolutionPayload.defense_result,
     applied_conditions: clone(resolutionPayload.applied_conditions),
+    concentration_required: concentrationRequired,
+    concentration_result: clone(resolutionPayload.concentration_result),
+    concentration_started: clone(resolutionPayload.concentration_started),
+    concentration_replaced: clone(resolutionPayload.concentration_replaced),
     combat: clone(combat)
   });
 }

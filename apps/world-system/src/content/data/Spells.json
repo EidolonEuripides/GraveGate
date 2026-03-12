@@ -354,6 +354,34 @@
       }
     },
     {
+      "id": "shield_of_faith",
+      "spell_id": "shield_of_faith",
+      "name": "Shield of Faith",
+      "level": 1,
+      "school": "abjuration",
+      "casting_time": "1 action",
+      "range": "60 feet",
+      "targeting": {
+        "type": "single_target"
+      },
+      "duration": "up to 10 minutes",
+      "concentration": true,
+      "attack_or_save": {
+        "type": "none"
+      },
+      "damage": null,
+      "class_refs": ["cleric", "paladin"],
+      "effect": {
+        "defense_ref": "spell_shield_of_faith_ac_bonus",
+        "ac_bonus": 2
+      },
+      "metadata": {
+        "starter_spell": true,
+        "source": "stage16_concentration_slice",
+        "class_refs": ["cleric", "paladin"]
+      }
+    },
+    {
       "id": "burning_hands",
       "spell_id": "burning_hands",
       "name": "Burning Hands",

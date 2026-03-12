@@ -157,6 +157,39 @@ function normalizeSingleItemPayload(commandOptions, commandName) {
   };
 }
 
+function normalizeFeatPayload(commandOptions) {
+  const action = normalizeIdentifier(getOptionValue(commandOptions, "action"));
+  const featId = normalizeIdentifier(getOptionValue(commandOptions, "feat_id"));
+  const abilityId = normalizeIdentifier(getOptionValue(commandOptions, "ability_id"));
+  const allowedActions = new Set(["list", "take"]);
+
+  if (!action || !allowedActions.has(action)) {
+    return {
+      ok: false,
+      payload: {},
+      error: "feat command requires a valid action"
+    };
+  }
+
+  if (action === "take" && !featId) {
+    return {
+      ok: false,
+      payload: {},
+      error: "take requires feat_id"
+    };
+  }
+
+  return {
+    ok: true,
+    payload: {
+      action,
+      feat_id: featId || null,
+      ability_id: abilityId || null
+    },
+    error: null
+  };
+}
+
 function normalizeMovePayload(commandOptions) {
   const directionRaw = normalizeIdentifier(getOptionValue(commandOptions, "direction"));
   const destinationId = normalizeIdentifier(getOptionValue(commandOptions, "destination_id"));
@@ -765,6 +798,13 @@ function resolveCommandMapping(commandName) {
     };
   }
 
+  if (name === "feat") {
+    return {
+      eventType: EVENT_TYPES.PLAYER_FEAT_REQUESTED,
+      targetSystem: "world_system"
+    };
+  }
+
   if (name === "dungeon") {
     return {
       eventType: EVENT_TYPES.PLAYER_ENTER_DUNGEON,
@@ -848,6 +888,7 @@ function mapSlashCommandToGatewayEvent(interaction) {
   const identifyPayload = commandName === "identify" ? normalizeSingleItemPayload(normalizedOptions, "identify") : null;
   const attunePayload = commandName === "attune" ? normalizeSingleItemPayload(normalizedOptions, "attune") : null;
   const unattunePayload = commandName === "unattune" ? normalizeSingleItemPayload(normalizedOptions, "unattune") : null;
+  const featPayload = commandName === "feat" ? normalizeFeatPayload(normalizedOptions) : null;
   const dungeonPayload = commandName === "dungeon" ? normalizeDungeonEnterPayload(rawOptions) : null;
   const leavePayload = commandName === "leave" ? normalizeLeavePayload(normalizedOptions) : null;
   const interactPayload = commandName === "interact" ? normalizeInteractPayload(normalizedOptions) : null;
@@ -891,6 +932,13 @@ function mapSlashCommandToGatewayEvent(interaction) {
 
   if (unattunePayload && !unattunePayload.ok) {
     return failure("gateway_command_map_failed", unattunePayload.error, {
+      command_name: commandName,
+      command_options: normalizedOptions
+    });
+  }
+
+  if (featPayload && !featPayload.ok) {
+    return failure("gateway_command_map_failed", featPayload.error, {
       command_name: commandName,
       command_options: normalizedOptions
     });
@@ -1003,6 +1051,7 @@ function mapSlashCommandToGatewayEvent(interaction) {
     ...(identifyPayload ? identifyPayload.payload : {}),
     ...(attunePayload ? attunePayload.payload : {}),
     ...(unattunePayload ? unattunePayload.payload : {}),
+    ...(featPayload ? featPayload.payload : {}),
     ...(dungeonPayload ? dungeonPayload.payload : {}),
     ...(leavePayload ? leavePayload.payload : {}),
     ...(interactPayload ? interactPayload.payload : {}),
@@ -1044,6 +1093,7 @@ module.exports = {
   normalizeEquipPayload,
   normalizeUnequipPayload,
   normalizeSingleItemPayload,
+  normalizeFeatPayload,
   normalizeDungeonEnterPayload,
   normalizeLeavePayload,
   normalizeAdminPayload,

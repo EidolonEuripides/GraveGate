@@ -236,6 +236,40 @@ function runCommandEventMapperTests() {
     assert.equal(unattuneOut.payload.event.payload.item_id, "item_ring_of_protection");
   }, results);
 
+  runTest("feat_command_maps_to_canonical_event_shape", () => {
+    const listOut = mapSlashCommandToGatewayEvent(
+      createInteraction("feat", {
+        options: { data: [{ name: "action", value: "list" }] }
+      })
+    );
+    const takeOut = mapSlashCommandToGatewayEvent(
+      createInteraction("feat", {
+        options: { data: [{ name: "action", value: "take" }, { name: "feat_id", value: "alert" }] }
+      })
+    );
+
+    assert.equal(listOut.ok, true);
+    assert.equal(takeOut.ok, true);
+    assert.equal(listOut.payload.event.event_type, "player_feat_requested");
+    assert.equal(takeOut.payload.event.event_type, "player_feat_requested");
+    assert.equal(listOut.payload.event.payload.action, "list");
+    assert.equal(takeOut.payload.event.payload.action, "take");
+    assert.equal(takeOut.payload.event.payload.feat_id, "alert");
+    assert.equal(takeOut.payload.event.payload.ability_id, null);
+  }, results);
+
+  runTest("feat_command_maps_optional_ability_choice", () => {
+    const out = mapSlashCommandToGatewayEvent(
+      createInteraction("feat", {
+        options: { data: [{ name: "action", value: "take" }, { name: "feat_id", value: "resilient" }, { name: "ability_id", value: "wisdom" }] }
+      })
+    );
+
+    assert.equal(out.ok, true);
+    assert.equal(out.payload.event.payload.feat_id, "resilient");
+    assert.equal(out.payload.event.payload.ability_id, "wisdom");
+  }, results);
+
   runTest("dungeon_enter_command_maps_to_canonical_event_shape", () => {
     const out = mapSlashCommandToGatewayEvent(
       createInteraction("dungeon", {

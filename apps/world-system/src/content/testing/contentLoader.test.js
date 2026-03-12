@@ -10,6 +10,7 @@ const {
   loadItemContent,
   loadMonsterContent,
   loadSpellContent,
+  loadFeatContent,
   loadDungeonContent,
   loadRecipeContent,
   loadStarterContentBundle,
@@ -48,6 +49,7 @@ function runContentLoaderTests() {
     assert.equal(typeof CONTENT_SCHEMAS.item, "object");
     assert.equal(typeof CONTENT_SCHEMAS.monster, "object");
     assert.equal(typeof CONTENT_SCHEMAS.spell, "object");
+    assert.equal(typeof CONTENT_SCHEMAS.feat, "object");
     assert.equal(typeof CONTENT_SCHEMAS.dungeon, "object");
     assert.equal(typeof CONTENT_SCHEMAS.recipe, "object");
   }, results);
@@ -59,6 +61,7 @@ function runContentLoaderTests() {
     expectLoaded(loadItemContent(), "item");
     expectLoaded(loadMonsterContent(), "monster");
     expectLoaded(loadSpellContent(), "spell");
+    expectLoaded(loadFeatContent(), "feat");
     expectLoaded(loadDungeonContent(), "dungeon");
     expectLoaded(loadRecipeContent(), "recipe");
   }, results);
@@ -75,6 +78,7 @@ function runContentLoaderTests() {
     assert.equal(Array.isArray(content.items), true);
     assert.equal(Array.isArray(content.monsters), true);
     assert.equal(Array.isArray(content.spells), true);
+    assert.equal(Array.isArray(content.feats), true);
     assert.equal(Array.isArray(content.dungeons), true);
     assert.equal(Array.isArray(content.recipes), true);
     assert.equal(typeof out.payload.cross_validation, "object");
@@ -214,6 +218,24 @@ function runContentLoaderTests() {
     assert.equal(Array.isArray(byId.magic_missile.class_refs), true);
     assert.equal(byId.shield.concentration, false);
     assert.equal(byId.bless.concentration, true);
+  }, results);
+
+  runTest("starter_feats_include_minimum_progression_slice", () => {
+    const out = loadFeatContent();
+    expectLoaded(out, "feat");
+
+    const feats = out.payload.entries;
+    const byId = {};
+    for (let i = 0; i < feats.length; i += 1) {
+      byId[String(feats[i].feat_id)] = feats[i];
+    }
+
+    assert.equal(Boolean(byId.alert), true);
+    assert.equal(Boolean(byId.tough), true);
+    assert.equal(Boolean(byId.war_caster), true);
+    assert.equal(Array.isArray(byId.alert.effects), true);
+    assert.equal(typeof byId.war_caster.prerequisites, "object");
+    assert.equal(byId.war_caster.prerequisites.spellcasting_required, true);
   }, results);
 
   runTest("starter_dungeons_include_tutorial_path_slice", () => {

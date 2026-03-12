@@ -1,0 +1,143 @@
+GateGrave System Handoff
+Date: 2026-03-12
+
+1. Systems changed
+- Character/profile/inventory UI:
+  - `/profile` is now a styled character sheet embed.
+  - `/inventory` is a button-driven viewer with tabs for summary, equipment, and magical items.
+  - Inventory viewer supports button-driven equip, unequip, identify, attune, unattune.
+- Dungeon/session interaction layer:
+  - Canonical `/interact` path now supports locked chests, locked doors, hidden doors, traps, levers, lore objects, shrines.
+  - Utility spell hooks on `/interact`: `light`, `thaumaturgy`, `knock`, `detect_magic`, `identify`.
+  - Skill, tool, and rolled check hooks are live on the dungeon interaction path.
+  - Room/session responses now include room snapshots with visible exits and visible objects.
+  - Gateway renders button-driven dungeon controls for exits and object actions.
+- Combat:
+  - Conditions framework is live.
+  - Reactions and opportunity attacks are live.
+  - Saving throws and typed damage are live in the starter spell slice.
+  - Monster AI foundation is live on the canonical combat progression path.
+  - Concentration support is live for the supported spell/damage slice.
+  - `War Caster` concentration advantage is live.
+  - Backend support exists for `War Caster` OA spell substitution.
+  - `/combat` is a canonical combat read command with refresh support.
+- Economy/world:
+  - Player-usable shop, craft, and trade flows are live.
+  - Shop/craft/trade views are button-driven enough to use in the current slice.
+- Feats:
+  - Canonical `/feat` list/take flow is live.
+  - Live feat support currently includes `alert`, `tough`, `mobile`, `resilient`, `war_caster`.
+
+2. Current working state
+- Core playable slice is stable enough to build on:
+  - `/start`
+  - `/profile`
+  - `/inventory`
+  - `/dungeon enter`
+  - `/move`
+  - `/interact`
+  - combat `attack`, `cast`, `move`, `use`
+  - `/combat`
+  - rewards/inventory persistence
+  - `/shop`, `/craft`, `/trade`
+- Gateway remains presentation/router only. Gameplay logic stayed in runtime/world/session/combat paths.
+- Room interaction and combat readback are much more readable than before.
+
+3. Known bugs / unfinished work
+- `War Caster` is not fully done from a UX perspective.
+  - Backend support is in for replacing OA with a spell.
+  - There is no player-facing reaction choice UI/window yet.
+- Feat system is still partial overall.
+  - No full level-up feat chooser yet.
+  - Only the currently listed feats have live effects.
+- Trade is usable, but barter depth is still limited.
+  - Stronger item-for-item proposal UX is not done.
+- Dungeon interaction depth is real, but content authors still need to use metadata patterns consistently.
+- Combat state/readback is good enough, but still not a final polished battle screen.
+
+4. Tests run and current result
+- Verified during this working slice:
+  - `node apps/combat-system/src/testing/concentrationState.test.js`
+  - `node apps/combat-system/src/testing/processCombatActionRequest.test.js`
+  - `node apps/combat-system/src/testing/castSpellAction.test.js`
+  - `node apps/world-system/src/character/testing/processFeatRequest.test.js`
+  - `node apps/world-system/src/character/testing/toCombatParticipant.test.js`
+  - `node apps/runtime/src/testing/readCommandRuntime.test.js`
+  - `node apps/gateway/src/testing/commandDefinitions.test.js`
+  - `node apps/gateway/src/testing/commandEventMapper.test.js`
+  - `node apps/gateway/src/testing/gatewayRuntimeIntegration.test.js`
+- All passed.
+- Note:
+  - `gatewayRuntimeIntegration.test.js` still prints the known intentional failure-path JSON line:
+    - `gateway_interaction_internal_error ... runtime exploded`
+  - That is expected from the test and is not the live bot failing.
+
+5. Architecture-sensitive decisions
+- No gameplay logic was moved into the gateway.
+- No second mutation paths were introduced for inventory, trade, dungeon, or combat.
+- Dungeon interaction work stays on:
+  - gateway command/button
+  - runtime event
+  - session interaction flow
+  - session persistence
+- Combat additions stay on:
+  - runtime combat dispatch
+  - combat action / progression flow
+  - combat persistence
+  - non-fatal render
+- Save-state normalization was added through character/progression/adapters rather than ad hoc combat-only logic.
+
+6. Files / areas that matter most
+- Gateway presentation and interaction wiring:
+  - `apps/gateway/src/index.js`
+  - `apps/gateway/src/discord/commandDefinitions.js`
+  - `apps/gateway/src/discord/commandEventMapper.js`
+- Runtime dispatch:
+  - `apps/runtime/src/domainCommandDispatchHandlers.js`
+- Dungeon interaction:
+  - `apps/dungeon-exploration/src/flow/interactWithObject.js`
+  - `apps/dungeon-exploration/src/flow/processActiveSessionAction.js`
+  - `apps/dungeon-exploration/src/flow/resolveInteractionCheck.js`
+- Combat:
+  - `apps/combat-system/src/flow/processCombatActionRequest.js`
+  - `apps/combat-system/src/flow/opportunityAttackFlow.js`
+  - `apps/combat-system/src/concentration/concentrationState.js`
+  - `apps/combat-system/src/actions/castSpellAction.js`
+- Character/feat/save state:
+  - `apps/world-system/src/character/flow/processFeatRequest.js`
+  - `apps/world-system/src/character/rules/featRules.js`
+  - `apps/world-system/src/character/rules/saveRules.js`
+  - `apps/world-system/src/character/adapters/toCombatParticipant.js`
+
+7. What should not be overwritten casually
+- `apps/gateway/src/index.js`
+  - this now contains a lot of button/view wiring for profile, inventory, economy, dungeon, and combat presentation
+- `apps/runtime/src/domainCommandDispatchHandlers.js`
+  - multiple canonical read/mutation payload shapes were tightened here
+- `apps/dungeon-exploration/src/flow/interactWithObject.js`
+  - this is now the core dungeon interaction engine
+- `apps/combat-system/src/flow/processCombatActionRequest.js`
+  - combat progression, OA, spellcasting, and persistence/render sequencing all converge here
+- `apps/world-system/src/character/rules/saveRules.js`
+  - new central save-derivation logic
+
+8. Map-system integration notes
+- Safe to build on:
+  - room snapshots in runtime responses
+  - visible exits
+  - visible objects
+  - object metadata-driven behaviors
+- Avoid touching:
+  - combat state as a second source of truth
+  - renderer as gameplay logic
+  - gateway as a place to resolve map/gameplay effects
+- If map work needs dungeon object or exit metadata, add it in content/session state and let runtime/session flows expose it. Do not bypass those flows.
+
+9. Recommended next steps
+- Highest-value next work:
+  - player-facing `War Caster` reaction choice flow
+  - broader feat/mechanics depth only where central hooks exist
+  - further command cleanup where typed IDs still leak through
+- If map integration needs support:
+  - expose more room/object display metadata
+  - keep it read-side only unless there is a real session-state reason to mutate

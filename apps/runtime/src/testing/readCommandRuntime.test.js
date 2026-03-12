@@ -183,14 +183,35 @@ async function runReadCommandRuntimeTests() {
         attunement_slots: 3,
         slots_used: 1,
         attuned_items: ["item_ring_of_protection"]
+      },
+      feat_slots: {
+        total_slots: 1,
+        used_slots: 1,
+        remaining_slots: 0
       }
     });
     profileCharacter.spellbook = {
       known_spell_ids: ["fire_bolt", "light"]
     };
+    profileCharacter.feats = ["alert", "war_caster"];
     characterPersistence.saveCharacter(profileCharacter);
 
-    const runtime = createReadCommandRuntime({ characterPersistence });
+    const runtime = createReadCommandRuntime({
+      characterPersistence,
+      loadContentBundle() {
+        return {
+          ok: true,
+          payload: {
+            content: {
+              feats: [
+                { feat_id: "alert", name: "Alert", description: "Init edge.", prerequisites: {}, effects: [], metadata: {} },
+                { feat_id: "war_caster", name: "War Caster", description: "Concentration edge.", prerequisites: {}, effects: [], metadata: {} }
+              ]
+            }
+          }
+        };
+      }
+    });
     const event = mapInteractionOrThrow(createInteraction("profile", [], playerId));
     const out = await runtime.processGatewayReadCommandEvent(event);
 
@@ -201,10 +222,141 @@ async function runReadCommandRuntimeTests() {
     assert.equal(response.payload.data.character.name, "Profile Hero");
     assert.equal(response.payload.data.character.attunement.slots_used, 1);
     assert.equal(response.payload.data.character.spellbook.known_spell_ids.length, 2);
+    assert.equal(response.payload.data.character.feats.length, 2);
+    assert.equal(response.payload.data.character.feats[0].name, "Alert");
+    assert.equal(response.payload.data.character.feat_slots.total_slots, 1);
     assert.equal(response.payload.data.character.armor_class, 17);
     assert.equal(response.payload.data.character.hp_summary.current, 38);
     assert.equal(response.payload.data.character.saving_throws.strength, 5);
     assert.equal(typeof response.payload.data.character, "object");
+  }, results);
+
+  await runTest("end_to_end_feat_command_through_canonical_path", async () => {
+    const adapter = createInMemoryAdapter();
+    const characterPersistence = new CharacterPersistenceBridge({ adapter });
+    const playerId = "player-read-feat-001";
+    characterPersistence.saveCharacter(createCharacterRecord({
+      character_id: "char-read-feat-001",
+      player_id: playerId,
+      name: "Feat Hero",
+      level: 4,
+      initiative: 2,
+      hitpoint_max: 20,
+      current_hitpoints: 20,
+      hp_summary: {
+        current: 20,
+        max: 20,
+        temporary: 0
+      }
+    }));
+
+    const runtime = createReadCommandRuntime({
+      characterPersistence,
+      loadContentBundle() {
+        return {
+          ok: true,
+          payload: {
+            content: {
+              feats: [
+                {
+                  feat_id: "alert",
+                  name: "Alert",
+                  description: "Init edge.",
+                  prerequisites: {},
+                  effects: [{ type: "initiative_bonus", value: 5 }],
+                  metadata: {}
+                },
+                {
+                  feat_id: "resilient",
+                  name: "Resilient",
+                  description: "Save edge.",
+                  prerequisites: {},
+                  effects: [{ type: "resilient_ability_choice" }],
+                  metadata: { requires_ability_choice: true }
+                }
+              ]
+            }
+          }
+        };
+      }
+    });
+
+    const listEvent = mapInteractionOrThrow(createInteraction("feat", [{ name: "action", value: "list" }], playerId));
+    const listOut = await runtime.processGatewayReadCommandEvent(listEvent);
+    const listResponse = findResponse(listOut, "feat");
+    assert.equal(listOut.ok, true);
+    assert.equal(Boolean(listResponse), true);
+    assert.equal(listResponse.payload.data.action, "list");
+    assert.equal(Array.isArray(listResponse.payload.data.feats), true);
+
+    const takeEvent = mapInteractionOrThrow(
+      createInteraction("feat", [{ name: "action", value: "take" }, { name: "feat_id", value: "alert" }], playerId)
+    );
+    const takeOut = await runtime.processGatewayReadCommandEvent(takeEvent);
+    const takeResponse = findResponse(takeOut, "feat");
+    assert.equal(takeOut.ok, true);
+    assert.equal(Boolean(takeResponse), true);
+    assert.equal(takeResponse.payload.data.action, "take");
+    assert.equal(takeResponse.payload.data.feat.name, "Alert");
+    assert.equal(takeResponse.payload.data.character.initiative, 7);
+  }, results);
+
+  await runTest("end_to_end_resilient_feat_take_updates_saving_throw_state", async () => {
+    const adapter = createInMemoryAdapter();
+    const characterPersistence = new CharacterPersistenceBridge({ adapter });
+    const playerId = "player-read-feat-resilient-001";
+    characterPersistence.saveCharacter(createCharacterRecord({
+      character_id: "char-read-feat-resilient-001",
+      player_id: playerId,
+      name: "Resilient Hero",
+      level: 4,
+      proficiency_bonus: 2,
+      stats: {
+        strength: 10,
+        dexterity: 10,
+        constitution: 10,
+        intelligence: 10,
+        wisdom: 10,
+        charisma: 10
+      }
+    }));
+
+    const runtime = createReadCommandRuntime({
+      characterPersistence,
+      loadContentBundle() {
+        return {
+          ok: true,
+          payload: {
+            content: {
+              feats: [
+                {
+                  feat_id: "resilient",
+                  name: "Resilient",
+                  description: "Save edge.",
+                  prerequisites: {},
+                  effects: [{ type: "resilient_ability_choice" }],
+                  metadata: { requires_ability_choice: true }
+                }
+              ]
+            }
+          }
+        };
+      }
+    });
+
+    const takeEvent = mapInteractionOrThrow(
+      createInteraction("feat", [
+        { name: "action", value: "take" },
+        { name: "feat_id", value: "resilient" },
+        { name: "ability_id", value: "wisdom" }
+      ], playerId)
+    );
+    const takeOut = await runtime.processGatewayReadCommandEvent(takeEvent);
+    const takeResponse = findResponse(takeOut, "feat");
+    assert.equal(takeOut.ok, true);
+    assert.equal(Boolean(takeResponse), true);
+    assert.equal(takeResponse.payload.data.character.saving_throws.wisdom, 2);
+    assert.equal(takeResponse.payload.data.character.stats.wisdom, 11);
   }, results);
 
   await runTest("end_to_end_inventory_command_through_canonical_path", async () => {

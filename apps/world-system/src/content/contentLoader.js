@@ -13,6 +13,7 @@ const FILE_MAP = {
   item: "Items.json",
   monster: "Monsters.json",
   spell: "Spells.json",
+  feat: "Feats.json",
   dungeon: "Dungeons.json",
   recipe: "Recipes.json",
   npc_shop: "NpcShops.json"
@@ -117,6 +118,10 @@ function loadSpellContent() {
   return loadContentFile("spell");
 }
 
+function loadFeatContent() {
+  return loadContentFile("feat");
+}
+
 function loadDungeonContent() {
   return loadContentFile("dungeon");
 }
@@ -137,6 +142,7 @@ function loadStarterContentBundle() {
     items: loadItemContent,
     monsters: loadMonsterContent,
     spells: loadSpellContent,
+    feats: loadFeatContent,
     dungeons: loadDungeonContent,
     recipes: loadRecipeContent,
     npc_shops: loadNpcShopContent
@@ -188,6 +194,7 @@ module.exports = {
   loadItemContent,
   loadMonsterContent,
   loadSpellContent,
+  loadFeatContent,
   loadDungeonContent,
   loadRecipeContent,
   loadNpcShopContent,

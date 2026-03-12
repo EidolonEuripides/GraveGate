@@ -7,6 +7,8 @@ const { rollSavingThrow } = require("../dice");
  * @param {object} input
  * @param {number} input.dc
  * @param {number} input.constitution_save_modifier
+ * @param {boolean} [input.advantage]
+ * @param {boolean} [input.disadvantage]
  * @param {Function} [input.rng]
  * @returns {object}
  */
@@ -16,6 +18,8 @@ function resolveConcentrationSave(input) {
 
   const rollResult = rollSavingThrow({
     modifier,
+    advantage: input.advantage === true,
+    disadvantage: input.disadvantage === true,
     rng: input.rng
   });
 

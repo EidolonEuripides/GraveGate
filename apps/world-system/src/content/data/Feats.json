@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "entries": [
+    {
+      "feat_id": "alert",
+      "name": "Alert",
+      "description": "You gain a sharp edge in initiative and are rarely caught flat-footed.",
+      "prerequisites": {},
+      "effects": [
+        {
+          "type": "initiative_bonus",
+          "value": 5
+        }
+      ],
+      "metadata": {
+        "category": "general",
+        "ui_tags": ["combat", "initiative"]
+      }
+    },
+    {
+      "feat_id": "tough",
+      "name": "Tough",
+      "description": "Your endurance deepens, increasing your hit point maximum as you grow.",
+      "prerequisites": {},
+      "effects": [
+        {
+          "type": "hitpoint_max_per_level",
+          "value": 2
+        }
+      ],
+      "metadata": {
+        "category": "general",
+        "ui_tags": ["combat", "durability"]
+      }
+    },
+    {
+      "feat_id": "war_caster",
+      "name": "War Caster",
+      "description": "You have practiced casting in the thick of battle and hold concentration more reliably.",
+      "prerequisites": {
+        "spellcasting_required": true
+      },
+      "effects": [
+        {
+          "type": "feature_flag",
+          "key": "war_caster",
+          "value": true
+        }
+      ],
+      "metadata": {
+        "category": "general",
+        "ui_tags": ["spellcasting", "concentration"]
+      }
+    },
+    {
+      "feat_id": "mobile",
+      "name": "Mobile",
+      "description": "Your speed increases and your battlefield movement becomes harder to pin down.",
+      "prerequisites": {},
+      "effects": [
+        {
+          "type": "movement_speed_bonus",
+          "value": 10
+        }
+      ],
+      "metadata": {
+        "category": "general",
+        "ui_tags": ["combat", "mobility"]
+      }
+    }
+  ]
+}

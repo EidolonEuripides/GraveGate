@@ -37,6 +37,7 @@ const EVENT_TYPES = {
   PLAYER_IDENTIFY_ITEM_REQUESTED: "player_identify_item_requested",
   PLAYER_ATTUNE_ITEM_REQUESTED: "player_attune_item_requested",
   PLAYER_UNATTUNE_ITEM_REQUESTED: "player_unattune_item_requested",
+  PLAYER_FEAT_REQUESTED: "player_feat_requested",
   PLAYER_ENTER_DUNGEON: "player_enter_dungeon",
   PLAYER_LEAVE_SESSION: "player_leave_session",
   PLAYER_INTERACT_OBJECT: "player_interact_object",

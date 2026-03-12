@@ -10,6 +10,7 @@ const {
   processIdentifyItemRequest,
   processAttunementRequest
 } = require("../../world-system/src/character/flow/processMagicalItemRequest");
+const { processFeatRequest } = require("../../world-system/src/character/flow/processFeatRequest");
 const {
   listNpcShopForPlayer,
   processNpcShopBuyRequest,
@@ -44,6 +45,8 @@ const {
   processCombatMoveRequest,
   processCombatUseItemRequest
 } = require("../../combat-system/src/flow/processCombatActionRequest");
+const { getRemainingFeatSlots, isFeatSlotAvailable } = require("../../world-system/src/character/rules/featRules");
+const { deriveSavingThrowState } = require("../../world-system/src/character/rules/saveRules");
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -109,6 +112,50 @@ function resolvePlayerCharacter(context, playerId) {
   }
   const rows = Array.isArray(listed.payload.characters) ? listed.payload.characters : [];
   return rows.find((entry) => String(entry.player_id || "") === String(playerId || "")) || null;
+}
+
+function resolveFeatIndexFromContent(context) {
+  if (!context || typeof context.loadContentBundle !== "function") {
+    return {};
+  }
+  const loaded = context.loadContentBundle();
+  if (!loaded || loaded.ok !== true) {
+    return {};
+  }
+  const content = loaded.payload && loaded.payload.content ? loaded.payload.content : {};
+  const feats = Array.isArray(content.feats) ? content.feats : [];
+  return feats.reduce((index, entry) => {
+    const featId = String(entry && entry.feat_id || "").trim().toLowerCase();
+    if (featId) {
+      index[featId] = clone(entry);
+    }
+    return index;
+  }, {});
+}
+
+function summarizeCharacterFeats(context, character) {
+  const featIds = Array.isArray(character && character.feats) ? character.feats : [];
+  const featIndex = resolveFeatIndexFromContent(context);
+  return featIds
+    .map((entry) => String(entry || "").trim().toLowerCase())
+    .filter(Boolean)
+    .map((featId) => {
+      const feat = featIndex[featId] || null;
+      return {
+        feat_id: featId,
+        name: feat && feat.name ? String(feat.name) : featId,
+        description: feat && feat.description ? String(feat.description) : null
+      };
+    });
+}
+
+function resolveCharacterSavingThrows(character) {
+  const savingThrows = character && character.saving_throws && typeof character.saving_throws === "object"
+    ? character.saving_throws
+    : {};
+  const hasNumericSummary = ["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"]
+    .some((key) => Number.isFinite(Number(savingThrows[key])));
+  return hasNumericSummary ? savingThrows : deriveSavingThrowState(character).saving_throws;
 }
 
 function resolveLootTableFromContent(context, lootTableId) {
@@ -943,6 +990,36 @@ function handleWorldCommandDispatch(event, context) {
     }, true, null, "world_system")];
   }
 
+  if (requestEvent.event_type === EVENT_TYPES.PLAYER_FEAT_REQUESTED) {
+    const replayState = rejectDuplicateMutationIfNeeded(requestEvent, context, "feat", "world_system");
+    if (replayState && replayState.event_type) {
+      return [replayState];
+    }
+    const out = processFeatRequest({
+      context,
+      player_id: requestEvent.player_id,
+      action: requestEvent.payload && requestEvent.payload.action,
+      feat_id: requestEvent.payload && requestEvent.payload.feat_id,
+      ability_id: requestEvent.payload && requestEvent.payload.ability_id
+    });
+    if (!out.ok) {
+      return [createGatewayResponseEvent(requestEvent, "feat", {}, false, out.error || "feat request failed", "world_system")];
+    }
+    if (String(out.payload.action || "").toLowerCase() === "take") {
+      markMutationReplaySuccess(context, replayState, true);
+    }
+    return [createGatewayResponseEvent(requestEvent, "feat", {
+      action: out.payload.action || "list",
+      feat: out.payload.feat || null,
+      feat_choice: out.payload.feat_choice || null,
+      feats: Array.isArray(out.payload.feats) ? clone(out.payload.feats) : [],
+      feat_slots: out.payload.feat_slots || null,
+      taken_feat_ids: Array.isArray(out.payload.taken_feat_ids) ? clone(out.payload.taken_feat_ids) : [],
+      applied_effects: Array.isArray(out.payload.applied_effects) ? clone(out.payload.applied_effects) : [],
+      character: out.payload.character || null
+    }, true, null, "world_system")];
+  }
+
   if (requestEvent.event_type === EVENT_TYPES.PLAYER_USE_ITEM) {
     const replayState = rejectDuplicateMutationIfNeeded(requestEvent, context, "use", "world_system");
     if (replayState && replayState.event_type) {
@@ -1355,6 +1432,7 @@ function handleCombatCommandDispatch(event, context) {
       hit: Boolean(attack.hit),
       damage_dealt: attack.damage_dealt || 0,
       target_hp_after: attack.target_hp_after,
+      concentration_result: attack.concentration_result || null,
       active_participant_id: progress.active_participant_id,
       combat_completed: progress.combat_completed,
       winner_team: progress.winner_team,
@@ -1397,6 +1475,10 @@ function handleCombatCommandDispatch(event, context) {
       healing_result: castSpell.healing_result || null,
       defense_result: castSpell.defense_result || null,
       applied_conditions: Array.isArray(castSpell.applied_conditions) ? clone(castSpell.applied_conditions) : [],
+      concentration_required: castSpell.concentration_required === true,
+      concentration_result: castSpell.concentration_result || null,
+      concentration_started: castSpell.concentration_started || null,
+      concentration_replaced: castSpell.concentration_replaced || null,
       active_participant_id: progress.active_participant_id,
       combat_completed: progress.combat_completed,
       winner_team: progress.winner_team,
@@ -1536,8 +1618,11 @@ function handleWorldReadRequest(event, context) {
           speed: Number.isFinite(Number(found.speed)) ? Number(found.speed) : 30,
           spellcasting_ability: found.spellcasting_ability || null,
           spellsave_dc: Number.isFinite(Number(found.spellsave_dc)) ? Number(found.spellsave_dc) : null,
-          saving_throws: found.saving_throws || {},
+          saving_throws: resolveCharacterSavingThrows(found),
           skills: found.skills || {},
+          feats: summarizeCharacterFeats(context, found),
+          feat_slots: getRemainingFeatSlots(found),
+          feat_available: isFeatSlotAvailable(found),
           attunement: found.attunement || { attunement_slots: 3, slots_used: 0, attuned_items: [] },
           spellbook: found.spellbook || {}
         }

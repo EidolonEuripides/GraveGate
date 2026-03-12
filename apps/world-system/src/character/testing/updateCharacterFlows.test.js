@@ -136,6 +136,24 @@ function runUpdateCharacterFlowsTests() {
     assert.equal(levelThree.ok, true);
     assert.equal(levelThree.payload.current_level, 3);
     assert.equal(levelThree.payload.subclass_available, true);
+    assert.equal(levelThree.payload.feat_available, false);
+  }, results);
+
+  runTest("feat_slot_availability_appears_at_asi_levels", () => {
+    const service = createServiceWithCharacter();
+
+    const out = updateCharacterProgress({
+      character_service: service,
+      character_id: "char-flow-001",
+      xp_delta: 2700
+    });
+
+    assert.equal(out.ok, true);
+    assert.equal(out.payload.current_level, 4);
+    assert.equal(out.payload.feat_available, true);
+    assert.equal(out.payload.feat_slots.total_slots, 1);
+    assert.equal(out.payload.feat_slots.remaining_slots, 1);
+    assert.equal(out.payload.character.progression.feat_available, true);
   }, results);
 
   runTest("level_one_subclass_classes_report_subclass_available_immediately", () => {

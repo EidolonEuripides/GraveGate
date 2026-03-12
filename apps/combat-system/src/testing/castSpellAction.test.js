@@ -474,6 +474,141 @@ function runCastSpellActionTests() {
     );
   }, results);
 
+  runTest("concentration_spell_starts_and_replaces_existing_concentration", () => {
+    const casterId = "caster-spell-concentration-001";
+    const combatId = "combat-spell-concentration-001";
+    const manager = createCombatReadyForSpell(combatId, casterId, {
+      known_spell_ids: ["hex_test", "shield_of_faith"]
+    });
+    const hexTest = {
+      spell_id: "hex_test",
+      name: "Hex Test",
+      casting_time: "1 action",
+      targeting: { type: "single_target" },
+      range: "90 feet",
+      concentration: true,
+      attack_or_save: { type: "auto_hit" },
+      applied_conditions: [
+        {
+          condition_type: "hexed",
+          expiration_trigger: "manual"
+        }
+      ]
+    };
+    const shieldOfFaith = {
+      spell_id: "shield_of_faith",
+      name: "Shield of Faith",
+      casting_time: "1 action",
+      targeting: { type: "single_target" },
+      range: "60 feet",
+      concentration: true,
+      attack_or_save: { type: "none" },
+      effect: {
+        defense_ref: "spell_shield_of_faith_ac_bonus",
+        ac_bonus: 2
+      }
+    };
+
+    const first = processCombatCastSpellRequest({
+      context: createCombatContext(manager, [hexTest, shieldOfFaith]),
+      player_id: casterId,
+      combat_id: combatId,
+      payload: {
+        spell_id: "hex_test",
+        target_id: "enemy-spell-001"
+      }
+    });
+    assert.equal(first.ok, true);
+    assert.equal(first.payload.cast_spell.concentration_required, true);
+    assert.equal(first.payload.cast_spell.concentration_started.source_spell_id, "hex_test");
+
+    const combatAfterFirst = manager.getCombatById(combatId).payload.combat;
+    const caster = combatAfterFirst.participants.find((entry) => entry.participant_id === casterId);
+    caster.action_available = true;
+    combatAfterFirst.turn_index = combatAfterFirst.initiative_order.indexOf(casterId);
+    manager.combats.set(combatId, combatAfterFirst);
+
+    const second = processCombatCastSpellRequest({
+      context: createCombatContext(manager, [hexTest, shieldOfFaith]),
+      player_id: casterId,
+      combat_id: combatId,
+      payload: {
+        spell_id: "shield_of_faith",
+        target_id: "ally-unrelated-001"
+      }
+    });
+
+    assert.equal(second.ok, true);
+    assert.equal(second.payload.cast_spell.concentration_required, true);
+    assert.equal(second.payload.cast_spell.concentration_started.source_spell_id, "shield_of_faith");
+    assert.equal(second.payload.cast_spell.concentration_replaced.source_spell_id, "hex_test");
+    const updatedCombat = manager.getCombatById(combatId).payload.combat;
+    assert.equal(updatedCombat.conditions.some((entry) => entry.condition_type === "hexed"), false);
+    const updatedCaster = updatedCombat.participants.find((entry) => entry.participant_id === casterId);
+    assert.equal(updatedCaster.concentration.source_spell_id, "shield_of_faith");
+  }, results);
+
+  runTest("damage_to_concentrating_target_from_spell_forces_concentration_save", () => {
+    const casterId = "caster-spell-concentration-break-001";
+    const combatId = "combat-spell-concentration-break-001";
+    const manager = createCombatReadyForSpell(combatId, casterId, {
+      known_spell_ids: ["fire_bolt"]
+    });
+    const combat = manager.getCombatById(combatId).payload.combat;
+    const target = combat.participants.find((entry) => entry.participant_id === "enemy-spell-001");
+    target.constitution_save_modifier = 0;
+    target.concentration = {
+      is_concentrating: true,
+      source_spell_id: "shield_of_faith",
+      target_actor_id: "enemy-spell-001",
+      linked_condition_ids: ["condition-concentration-spell-001"],
+      linked_restorations: [],
+      started_at_round: 1,
+      broken_reason: null
+    };
+    combat.conditions = [{
+      condition_id: "condition-concentration-spell-001",
+      condition_type: "shield_of_faith",
+      source_actor_id: "enemy-spell-001",
+      target_actor_id: "enemy-spell-001",
+      expiration_trigger: "manual",
+      metadata: {}
+    }];
+    manager.combats.set(combatId, combat);
+
+    const fireBolt = {
+      spell_id: "fire_bolt",
+      name: "Fire Bolt",
+      casting_time: "1 action",
+      targeting: { type: "single_target" },
+      range: "120 feet",
+      attack_or_save: { type: "spell_attack" },
+      damage: { dice: "1d10", damage_type: "fire" }
+    };
+
+    const out = processCombatCastSpellRequest({
+      context: createCombatContext(manager, [fireBolt], {
+        spellAttackRollFn: () => ({ final_total: 20 }),
+        spellDamageRng: () => 0,
+        concentrationSaveRng: () => 0
+      }),
+      player_id: casterId,
+      combat_id: combatId,
+      payload: {
+        spell_id: "fire_bolt",
+        target_id: "enemy-spell-001"
+      }
+    });
+
+    assert.equal(out.ok, true);
+    assert.equal(Boolean(out.payload.cast_spell.concentration_result), true);
+    assert.equal(out.payload.cast_spell.concentration_result.concentration_broken, true);
+    const updatedCombat = manager.getCombatById(combatId).payload.combat;
+    const updatedTarget = updatedCombat.participants.find((entry) => entry.participant_id === "enemy-spell-001");
+    assert.equal(updatedTarget.concentration.is_concentrating, false);
+    assert.equal(updatedCombat.conditions.length, 0);
+  }, results);
+
   runTest("dead_inactive_or_out_of_range_actor_cannot_cast", () => {
     const deadCasterId = "caster-spell-dead-001";
     const deadCombatId = "combat-spell-dead-001";
