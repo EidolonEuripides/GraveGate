@@ -80,7 +80,7 @@ On the clean `12x12` map, token placement is correct.
 
 This means:
 - the current renderer can place tokens correctly on mathematically aligned maps
-- earlier placement issues were caused by art/grid calibration problems in specific maps, especially `forest-road` and the first cave test map
+- earlier placement issues were caused by art/grid calibration problems in painterly or irregular test maps, especially the retired `forest-road` demo and the first cave test map
 
 
 4) Current Terrain Authoring Reality

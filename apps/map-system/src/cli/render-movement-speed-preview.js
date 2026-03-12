@@ -14,9 +14,9 @@ function parseArg(name) {
 
 function main() {
   const repoRoot = process.cwd();
-  const mapPathArg = parseArg("map") || "apps/map-system/data/maps/forest-road.base-map.json";
-  const profilePathArg = parseArg("profile") || "apps/map-system/data/profiles/forest-road.combat-profile.json";
-  const outputPathArg = parseArg("output") || "apps/map-system/output/forest-road.movement-speed-preview.svg";
+  const mapPathArg = parseArg("map") || "apps/map-system/data/maps/map-12x12.base-map.json";
+  const profilePathArg = parseArg("profile") || "apps/map-system/data/profiles/map-12x12.combat-profile.json";
+  const outputPathArg = parseArg("output") || "apps/map-system/output/map-12x12.movement-speed-preview.svg";
   const map = loadMapWithProfile({
     map_path: path.resolve(repoRoot, mapPathArg),
     profile_path: profilePathArg ? path.resolve(repoRoot, profilePathArg) : ""
@@ -26,7 +26,7 @@ function main() {
     token_id: "movement-fast-player",
     label: "P30",
     actor_id: "movement-fast-player",
-    position: { x: 10, y: 20 },
+    position: { x: 2, y: 9 },
     badge_text: "30",
     asset_path: "apps/map-system/assets/tokens/players/processed/male-tiefling-03.cleaned.png"
   });
@@ -36,7 +36,7 @@ function main() {
     token_id: "movement-slow-player",
     label: "P15",
     actor_id: "movement-slow-player",
-    position: { x: 10, y: 8 },
+    position: { x: 8, y: 3 },
     badge_text: "15",
     asset_path: "apps/map-system/assets/tokens/players/processed/elf-male-01.cleaned.png"
   });
@@ -66,7 +66,7 @@ function main() {
 
   const previewMap = {
     ...map,
-    name: "Forest Road Movement Speed Preview",
+    name: "Map 12x12 Movement Speed Preview",
     tokens: [fastActor, slowActor],
     overlays: [fastOverlay, slowOverlay]
   };

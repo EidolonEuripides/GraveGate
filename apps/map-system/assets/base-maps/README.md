@@ -2,6 +2,7 @@
 
 Put full background map images here.
 
-For the included forest-road demo, save your uploaded image as:
+Recommended workflow:
 
-- `forest-road-22x28.png`
+- keep clean control maps here while debugging placement and mask logic
+- add prettier presentation maps later, once the matching mask or edge-wall data is stable

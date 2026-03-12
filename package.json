@@ -89,7 +89,7 @@
     "test:alpha": "npm run alpha:preflight && npm run test:alpha:smoke && npm run test:alpha:regression"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20.12.2"
   },
   "dependencies": {
     "discord.js": "^14.25.1",

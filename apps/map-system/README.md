@@ -161,7 +161,7 @@ Use the terrain stamping CLI to add semantic obstacle zones to a combat profile 
 
 ```powershell
 node apps/map-system/src/cli/stamp-terrain.js --list-presets=true
-node apps/map-system/src/cli/stamp-terrain.js --profile=apps/map-system/data/profiles/forest-road.combat-profile.json --preset=tree_cluster --x=8 --y=13 --radius=1 --zone-id=west-mid-tree-cluster
+node apps/map-system/src/cli/stamp-terrain.js --profile=apps/map-system/data/profiles/my-map.combat-profile.json --preset=tree_cluster --x=8 --y=13 --radius=1 --zone-id=west-mid-tree-cluster
 ```
 
 This workflow is intended to be the default way you author things like:
@@ -174,13 +174,14 @@ This workflow is intended to be the default way you author things like:
 - mountains
 - tree clusters
 
-## First Real Combat Profile
+## Included Control Profiles
 
-The first authored combat profile for the forest road map now lives at:
+The cleanest included combat profiles to build from now are:
 
-- `apps/map-system/data/profiles/forest-road.combat-profile.json`
+- `apps/map-system/data/profiles/map-12x10.combat-profile.json`
+- `apps/map-system/data/profiles/cave-map-01.combat-profile.json`
 
-That file is meant to be the starting point for real combat-map authoring. The older annotated demo profile can still exist for renderer demos, but this combat profile is the cleaner authored path going forward.
+These exist specifically to keep terrain authoring and token placement debugging grounded on clean, mask-driven maps instead of painterly art.
 
 ## Why SVG First
 
@@ -193,24 +194,18 @@ This repository does not currently include a Node PNG rendering dependency. The 
 - Token art: `apps/map-system/assets/tokens/`
 - Reusable overlay art: `apps/map-system/assets/overlays/`
 
-## Demo Map
+## Included Control Maps
 
-The included demo definition assumes your forest-road map is:
+The included clean control maps are:
 
-- `width = 22`
-- `height = 28`
-- `tile_size = 70`
-- `pixel_width = 1540`
-- `pixel_height = 1960`
-
-Place your PNG at:
-
-- `apps/map-system/assets/base-maps/forest-road-22x28.png`
+- `apps/map-system/data/maps/map-12x12.base-map.json`
+- `apps/map-system/data/maps/map-12x10.base-map.json`
+- `apps/map-system/data/maps/cave-map-01.base-map.json`
 
 ## Render Demo
 
 ```powershell
-node apps/map-system/src/cli/render-map.js --map=apps/map-system/data/maps/forest-road.base-map.json --profile=apps/map-system/data/profiles/forest-road.obstacles-and-demo.json --output=apps/map-system/output/forest-road.demo.svg
+node apps/map-system/src/cli/render-map.js --map=apps/map-system/data/maps/map-12x10.base-map.json --profile=apps/map-system/data/profiles/map-12x10.combat-profile.json,apps/map-system/data/profiles/map-12x10.movement-preview.json --output=apps/map-system/output/map-12x10.movement-preview.svg
 ```
 
 ## Authoring Pattern
@@ -442,7 +437,7 @@ node scripts/map-system-cli.js test
 To render a comparison snapshot showing one actor at `30 feet` of movement and one actor at `15 feet`:
 
 ```powershell
-node apps/map-system/src/cli/render-movement-speed-preview.js --map=apps/map-system/data/maps/forest-road.base-map.json --output=apps/map-system/output/forest-road.movement-speed-preview.svg
+node apps/map-system/src/cli/render-movement-speed-preview.js --map=apps/map-system/data/maps/map-12x12.base-map.json --output=apps/map-system/output/map-12x12.movement-speed-preview.svg
 ```
 
 The root package also exposes matching convenience scripts:
