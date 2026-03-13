@@ -1,8 +1,8 @@
 # Mike lane: map system
 /apps/map-system/** @EidolonEuripides
 
-# CODEOWNERS must own itself
-/.github/CODEOWNERS @EidolonEuripides @GateGrave
+# Governance and CI files must be jointly owned
+/.github/** @EidolonEuripides @GateGrave
 
 # Mike lane: canonical docs
 /README.md @EidolonEuripides
