@@ -1,0 +1,26 @@
+name: Main Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  gate-main:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.12.2
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run main gate
+        run: npm run gate:main
