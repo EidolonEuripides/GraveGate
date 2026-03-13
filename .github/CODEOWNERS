@@ -1,0 +1,22 @@
+# Mike lane: map system
+/apps/map-system/** @EidolonEuripides
+
+# Mike lane: canonical docs
+/README.md @EidolonEuripides
+/AGENTS.md @EidolonEuripides
+/docs/CONSTITUTION.md @EidolonEuripides
+/docs/PROJECT_ROADMAP.md @EidolonEuripides
+/docs/IMPLEMENTATION_STATUS.md @EidolonEuripides
+/docs/MAP_ROADMAP.md @EidolonEuripides
+/docs/MAP_AUTHORING.md @EidolonEuripides
+/docs/README.md @EidolonEuripides
+
+# Jon lane: gameplay systems
+/apps/combat-system/** @GateGrave
+/apps/dungeon-exploration/** @GateGrave
+/apps/world-system/** @GateGrave
+/apps/controller/** @GateGrave
+
+# Shared integration hot files
+/apps/gateway/src/index.js @EidolonEuripides @GateGrave
+/apps/runtime/src/domainCommandDispatchHandlers.js @EidolonEuripides @GateGrave
