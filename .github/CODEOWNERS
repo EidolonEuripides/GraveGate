@@ -1,6 +1,9 @@
 # Mike lane: map system
 /apps/map-system/** @EidolonEuripides
 
+# CODEOWNERS must own itself
+/.github/CODEOWNERS @EidolonEuripides @GateGrave
+
 # Mike lane: canonical docs
 /README.md @EidolonEuripides
 /AGENTS.md @EidolonEuripides
