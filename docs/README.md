@@ -27,8 +27,10 @@ Use these documents first.
 
 - `history/`
   - dated handoffs
-  - local backup notes
+  - repo-safe historical notes
   - project snapshots
   - older status files
 
 Historical documents are context, not policy.
+
+Local-only backups and scratch notes belong outside versioned docs, for example in gitignored backup locations.
