@@ -1,0 +1,633 @@
+{
+  "name": "Map 12x10 Dungeon Profile",
+  "terrain": [
+    {
+      "x": 2,
+      "y": 1,
+      "terrain_type": "wall",
+      "mask_color": "#000000",
+      "mask_generated": true
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "terrain_type": "wall",
+      "mask_color": "#000000",
+      "mask_generated": true
+    },
+    {
+      "x": 4,
+      "y": 1,
+      "terrain_type": "wall",
+      "mask_color": "#000000",
+      "mask_generated": true
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "terrain_type": "wall",
+      "mask_color": "#000000",
+      "mask_generated": true
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "terrain_type": "wall",
+      "mask_color": "#000000",
+      "mask_generated": true
+    },
+    {
+      "x": 4,
+      "y": 2,
+      "terrain_type": "wall",
+      "mask_color": "#000000",
+      "mask_generated": true
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "terrain_type": "wall",
+      "mask_color": "#000000",
+      "mask_generated": true
+    },
+    {
+      "x": 3,
+      "y": 3,
+      "terrain_type": "wall",
+      "mask_color": "#000000",
+      "mask_generated": true
+    },
+    {
+      "x": 4,
+      "y": 3,
+      "terrain_type": "wall",
+      "mask_color": "#000000",
+      "mask_generated": true
+    },
+    {
+      "x": 2,
+      "y": 5,
+      "terrain_type": "wall",
+      "mask_color": "#000000",
+      "mask_generated": true
+    },
+    {
+      "x": 3,
+      "y": 5,
+      "terrain_type": "wall",
+      "mask_color": "#000000",
+      "mask_generated": true
+    },
+    {
+      "x": 4,
+      "y": 5,
+      "terrain_type": "wall",
+      "mask_color": "#000000",
+      "mask_generated": true
+    },
+    {
+      "x": 2,
+      "y": 6,
+      "terrain_type": "wall",
+      "mask_color": "#000000",
+      "mask_generated": true
+    },
+    {
+      "x": 3,
+      "y": 6,
+      "terrain_type": "wall",
+      "mask_color": "#000000",
+      "mask_generated": true
+    },
+    {
+      "x": 4,
+      "y": 6,
+      "terrain_type": "wall",
+      "mask_color": "#000000",
+      "mask_generated": true
+    }
+  ],
+  "terrain_zones": [],
+  "tokens": [],
+  "overlays": [],
+  "terrain_mask_metadata": {
+    "palette_id": "mspaint_basic",
+    "tile_count": 120,
+    "generated_terrain_tiles": 15,
+    "generated_edge_walls": 46,
+    "unmatched_tiles": 0,
+    "terrain_type_counts": {
+      "open": 105,
+      "wall": 15
+    },
+    "mask_path": "apps/map-system/assets/masks/dungeon/mask-12x10.png"
+  },
+  "edge_walls": [
+    {
+      "x": 6,
+      "y": 0,
+      "side": "west",
+      "blocks_movement": true,
+      "blocks_sight": true,
+      "edge_generated": true,
+      "mask_generated": true,
+      "mask_color": "#000000",
+      "terrain_type": "wall"
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "side": "west",
+      "blocks_movement": true,
+      "blocks_sight": true,
+      "edge_generated": true,
+      "mask_generated": true,
+      "mask_color": "#000000",
+      "terrain_type": "wall"
+    },
+    {
+      "x": 4,
+      "y": 1,
+      "side": "west",
+      "blocks_movement": true,
+      "blocks_sight": true,
+      "edge_generated": true,
+      "mask_generated": true,
+      "mask_color": "#000000",
+      "terrain_type": "wall"
+    },
+    {
+      "x": 6,
+      "y": 1,
+      "side": "west",
+      "blocks_movement": true,
+      "blocks_sight": true,
+      "edge_generated": true,
+      "mask_generated": true,
+      "mask_color": "#000000",
+      "terrain_type": "wall"
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "side": "west",
+      "blocks_movement": true,
+      "blocks_sight": true,
+      "edge_generated": true,
+      "mask_generated": true,
+      "mask_color": "#000000",
+      "terrain_type": "wall"
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "side": "west",
+      "blocks_movement": true,
+      "blocks_sight": true,
+      "edge_generated": true,
+      "mask_generated": true,
+      "mask_color": "#000000",
+      "terrain_type": "wall"
+    },
+    {
+      "x": 4,
+      "y": 2,
+      "side": "west",
+      "blocks_movement": true,
+      "blocks_sight": true,
+      "edge_generated": true,
+      "mask_generated": true,
+      "mask_color": "#000000",
+      "terrain_type": "wall"
+    },
+    {
+      "x": 5,
+      "y": 2,
+      "side": "west",
+      "blocks_movement": true,
+      "blocks_sight": true,
+      "edge_generated": true,
+      "mask_generated": true,
+      "mask_color": "#000000",
+      "terrain_type": "wall"
+    },
+    {
+      "x": 6,
+      "y": 2,
+      "side": "west",
+      "blocks_movement": true,
+      "blocks_sight": true,
+      "edge_generated": true,
+      "mask_generated": true,
+      "mask_color": "#000000",
+      "terrain_type": "wall"
+    },
+    {
+      "x": 3,
+      "y": 3,
+      "side": "west",
+      "blocks_movement": true,
+      "blocks_sight": true,
+      "edge_generated": true,
+      "mask_generated": true,
+      "mask_color": "#000000",
+      "terrain_type": "wall"
+    },
+    {
+      "x": 4,
+      "y": 3,
+      "side": "west",
+      "blocks_movement": true,
+      "blocks_sight": true,
+      "edge_generated": true,
+      "mask_generated": true,
+      "mask_color": "#000000",
+      "terrain_type": "wall"
+    },
+    {
+      "x": 6,
+      "y": 3,
+      "side": "west",
+      "blocks_movement": true,
+      "blocks_sight": true,
+      "edge_generated": true,
+      "mask_generated": true,
+      "mask_color": "#000000",
+      "terrain_type": "wall"
+    },
+    {
+      "x": 6,
+      "y": 4,
+      "side": "west",
+      "blocks_movement": true,
+      "blocks_sight": true,
+      "edge_generated": true,
+      "mask_generated": true,
+      "mask_color": "#000000",
+      "terrain_type": "wall"
+    },
+    {
+      "x": 3,
+      "y": 5,
+      "side": "west",
+      "blocks_movement": true,
+      "blocks_sight": true,
+      "edge_generated": true,
+      "mask_generated": true,
+      "mask_color": "#000000",
+      "terrain_type": "wall"
+    },
+    {
+      "x": 4,
+      "y": 5,
+      "side": "west",
+      "blocks_movement": true,
+      "blocks_sight": true,
+      "edge_generated": true,
+      "mask_generated": true,
+      "mask_color": "#000000",
+      "terrain_type": "wall"
+    },
+    {
+      "x": 6,
+      "y": 5,
+      "side": "west",
+      "blocks_movement": true,
+      "blocks_sight": true,
+      "edge_generated": true,
+      "mask_generated": true,
+      "mask_color": "#000000",
+      "terrain_type": "wall"
+    },
+    {
+      "x": 3,
+      "y": 6,
+      "side": "west",
+      "blocks_movement": true,
+      "blocks_sight": true,
+      "edge_generated": true,
+      "mask_generated": true,
+      "mask_color": "#000000",
+      "terrain_type": "wall"
+    },
+    {
+      "x": 4,
+      "y": 6,
+      "side": "west",
+      "blocks_movement": true,
+      "blocks_sight": true,
+      "edge_generated": true,
+      "mask_generated": true,
+      "mask_color": "#000000",
+      "terrain_type": "wall"
+    },
+    {
+      "x": 6,
+      "y": 8,
+      "side": "west",
+      "blocks_movement": true,
+      "blocks_sight": true,
+      "edge_generated": true,
+      "mask_generated": true,
+      "mask_color": "#000000",
+      "terrain_type": "wall"
+    },
+    {
+      "x": 6,
+      "y": 9,
+      "side": "west",
+      "blocks_movement": true,
+      "blocks_sight": true,
+      "edge_generated": true,
+      "mask_generated": true,
+      "mask_color": "#000000",
+      "terrain_type": "wall"
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "side": "north",
+      "blocks_movement": true,
+      "blocks_sight": true,
+      "edge_generated": true,
+      "mask_generated": true,
+      "mask_color": "#000000",
+      "terrain_type": "wall"
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "side": "north",
+      "blocks_movement": true,
+      "blocks_sight": true,
+      "edge_generated": true,
+      "mask_generated": true,
+      "mask_color": "#000000",
+      "terrain_type": "wall"
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "side": "north",
+      "blocks_movement": true,
+      "blocks_sight": true,
+      "edge_generated": true,
+      "mask_generated": true,
+      "mask_color": "#000000",
+      "terrain_type": "wall"
+    },
+    {
+      "x": 4,
+      "y": 2,
+      "side": "north",
+      "blocks_movement": true,
+      "blocks_sight": true,
+      "edge_generated": true,
+      "mask_generated": true,
+      "mask_color": "#000000",
+      "terrain_type": "wall"
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "side": "north",
+      "blocks_movement": true,
+      "blocks_sight": true,
+      "edge_generated": true,
+      "mask_generated": true,
+      "mask_color": "#000000",
+      "terrain_type": "wall"
+    },
+    {
+      "x": 3,
+      "y": 3,
+      "side": "north",
+      "blocks_movement": true,
+      "blocks_sight": true,
+      "edge_generated": true,
+      "mask_generated": true,
+      "mask_color": "#000000",
+      "terrain_type": "wall"
+    },
+    {
+      "x": 4,
+      "y": 3,
+      "side": "north",
+      "blocks_movement": true,
+      "blocks_sight": true,
+      "edge_generated": true,
+      "mask_generated": true,
+      "mask_color": "#000000",
+      "terrain_type": "wall"
+    },
+    {
+      "x": 3,
+      "y": 4,
+      "side": "north",
+      "blocks_movement": true,
+      "blocks_sight": true,
+      "edge_generated": true,
+      "mask_generated": true,
+      "mask_color": "#000000",
+      "terrain_type": "wall"
+    },
+    {
+      "x": 3,
+      "y": 5,
+      "side": "north",
+      "blocks_movement": true,
+      "blocks_sight": true,
+      "edge_generated": true,
+      "mask_generated": true,
+      "mask_color": "#000000",
+      "terrain_type": "wall"
+    },
+    {
+      "x": 4,
+      "y": 5,
+      "side": "north",
+      "blocks_movement": true,
+      "blocks_sight": true,
+      "edge_generated": true,
+      "mask_generated": true,
+      "mask_color": "#000000",
+      "terrain_type": "wall"
+    },
+    {
+      "x": 2,
+      "y": 6,
+      "side": "north",
+      "blocks_movement": true,
+      "blocks_sight": true,
+      "edge_generated": true,
+      "mask_generated": true,
+      "mask_color": "#000000",
+      "terrain_type": "wall"
+    },
+    {
+      "x": 3,
+      "y": 6,
+      "side": "north",
+      "blocks_movement": true,
+      "blocks_sight": true,
+      "edge_generated": true,
+      "mask_generated": true,
+      "mask_color": "#000000",
+      "terrain_type": "wall"
+    },
+    {
+      "x": 4,
+      "y": 6,
+      "side": "north",
+      "blocks_movement": true,
+      "blocks_sight": true,
+      "edge_generated": true,
+      "mask_generated": true,
+      "mask_color": "#000000",
+      "terrain_type": "wall"
+    },
+    {
+      "x": 6,
+      "y": 6,
+      "side": "north",
+      "blocks_movement": true,
+      "blocks_sight": true,
+      "edge_generated": true,
+      "mask_generated": true,
+      "mask_color": "#000000",
+      "terrain_type": "wall"
+    },
+    {
+      "x": 7,
+      "y": 6,
+      "side": "north",
+      "blocks_movement": true,
+      "blocks_sight": true,
+      "edge_generated": true,
+      "mask_generated": true,
+      "mask_color": "#000000",
+      "terrain_type": "wall"
+    },
+    {
+      "x": 8,
+      "y": 6,
+      "side": "north",
+      "blocks_movement": true,
+      "blocks_sight": true,
+      "edge_generated": true,
+      "mask_generated": true,
+      "mask_color": "#000000",
+      "terrain_type": "wall"
+    },
+    {
+      "x": 9,
+      "y": 6,
+      "side": "north",
+      "blocks_movement": true,
+      "blocks_sight": true,
+      "edge_generated": true,
+      "mask_generated": true,
+      "mask_color": "#000000",
+      "terrain_type": "wall"
+    },
+    {
+      "x": 10,
+      "y": 6,
+      "side": "north",
+      "blocks_movement": true,
+      "blocks_sight": true,
+      "edge_generated": true,
+      "mask_generated": true,
+      "mask_color": "#000000",
+      "terrain_type": "wall"
+    },
+    {
+      "x": 11,
+      "y": 6,
+      "side": "north",
+      "blocks_movement": true,
+      "blocks_sight": true,
+      "edge_generated": true,
+      "mask_generated": true,
+      "mask_color": "#000000",
+      "terrain_type": "wall"
+    },
+    {
+      "x": 2,
+      "y": 7,
+      "side": "north",
+      "blocks_movement": true,
+      "blocks_sight": true,
+      "edge_generated": true,
+      "mask_generated": true,
+      "mask_color": "#000000",
+      "terrain_type": "wall"
+    },
+    {
+      "x": 3,
+      "y": 7,
+      "side": "north",
+      "blocks_movement": true,
+      "blocks_sight": true,
+      "edge_generated": true,
+      "mask_generated": true,
+      "mask_color": "#000000",
+      "terrain_type": "wall"
+    },
+    {
+      "x": 6,
+      "y": 8,
+      "side": "north",
+      "blocks_movement": true,
+      "blocks_sight": true,
+      "edge_generated": true,
+      "mask_generated": true,
+      "mask_color": "#000000",
+      "terrain_type": "wall"
+    },
+    {
+      "x": 7,
+      "y": 8,
+      "side": "north",
+      "blocks_movement": true,
+      "blocks_sight": true,
+      "edge_generated": true,
+      "mask_generated": true,
+      "mask_color": "#000000",
+      "terrain_type": "wall"
+    },
+    {
+      "x": 8,
+      "y": 8,
+      "side": "north",
+      "blocks_movement": true,
+      "blocks_sight": true,
+      "edge_generated": true,
+      "mask_generated": true,
+      "mask_color": "#000000",
+      "terrain_type": "wall"
+    },
+    {
+      "x": 9,
+      "y": 8,
+      "side": "north",
+      "blocks_movement": true,
+      "blocks_sight": true,
+      "edge_generated": true,
+      "mask_generated": true,
+      "mask_color": "#000000",
+      "terrain_type": "wall"
+    },
+    {
+      "x": 10,
+      "y": 8,
+      "side": "north",
+      "blocks_movement": true,
+      "blocks_sight": true,
+      "edge_generated": true,
+      "mask_generated": true,
+      "mask_color": "#000000",
+      "terrain_type": "wall"
+    }
+  ]
+}

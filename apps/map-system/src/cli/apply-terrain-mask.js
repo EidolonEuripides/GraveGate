@@ -30,6 +30,16 @@ function mergeUniqueByCoordinate(primaryList, secondaryList) {
   return Array.from(merged.values());
 }
 
+function mergeUniqueByEdgeKey(primaryList, secondaryList) {
+  const merged = new Map();
+
+  [].concat(primaryList || [], secondaryList || []).forEach((entry) => {
+    merged.set(`${entry.x},${entry.y},${entry.side}`, entry);
+  });
+
+  return Array.from(merged.values());
+}
+
 async function main() {
   const mapPathArg = parseArg("map");
   const profilePathArg = parseArg("profile");
@@ -45,7 +55,7 @@ async function main() {
   const profilePath = profilePathArg ? path.resolve(repoRoot, profilePathArg) : "";
   const outputProfilePath = outputProfileArg
     ? path.resolve(repoRoot, outputProfileArg)
-    : (profilePath || path.resolve(repoRoot, "apps/map-system/data/profiles/mask-generated.profile.json"));
+    : (profilePath || path.resolve(repoRoot, "apps/map-system/data/profiles/combat/mask-generated.profile.json"));
 
   const baseMap = loadJsonFile(mapPath);
   const existingProfile = profilePath && fs.existsSync(profilePath)
@@ -53,6 +63,7 @@ async function main() {
     : {
       name: `${baseMap.name || baseMap.map_id || "Map"} Mask Profile`,
       terrain: [],
+      edge_walls: [],
       terrain_zones: [],
       tokens: [],
       overlays: []
@@ -65,8 +76,10 @@ async function main() {
   }
 
   const preservedManualTerrain = (existingProfile.terrain || []).filter((entry) => entry.mask_generated !== true);
+  const preservedManualEdgeWalls = (existingProfile.edge_walls || []).filter((entry) => entry.mask_generated !== true);
   const nextProfile = clone(existingProfile);
   nextProfile.terrain = mergeUniqueByCoordinate(built.terrain, preservedManualTerrain);
+  nextProfile.edge_walls = mergeUniqueByEdgeKey(built.edge_walls, preservedManualEdgeWalls);
   nextProfile.terrain_mask_metadata = built.summary;
 
   fs.mkdirSync(path.dirname(outputProfilePath), { recursive: true });

@@ -1,7 +1,7 @@
 {
   "map_id": "map-12x10",
   "map_type": "combat",
-  "name": "Map 12x10 Base Map",
+  "name": "Map 12x10 Combat Base Map",
   "instance_id": "map-instance-12x10",
   "instance_binding": {
     "instance_type": "combat",
@@ -13,8 +13,8 @@
     "tile_size": 70
   },
   "asset": {
-    "base_image_path": "apps/map-system/assets/base-maps/map_12x10.png",
-    "terrain_mask_path": "apps/map-system/assets/masks/mask-12x10.png",
+    "base_image_path": "apps/map-system/assets/base-maps/combat/map_12x10.png",
+    "terrain_mask_path": "apps/map-system/assets/masks/combat/mask-12x10.png",
     "terrain_mask_palette_id": "mspaint_basic",
     "has_embedded_grid": true,
     "render_width_px": 840,

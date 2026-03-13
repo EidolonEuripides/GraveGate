@@ -3,6 +3,7 @@
 const fs = require("fs");
 const path = require("path");
 const { renderMapSvg } = require("../render/render-map-svg");
+const { renderMapPng } = require("../render/render-map-png");
 const { loadMapWithProfile, normalizeProfilePaths } = require("../core/map-profile-loader");
 
 function parseArg(name) {
@@ -11,7 +12,7 @@ function parseArg(name) {
   return found ? found.slice(prefix.length) : "";
 }
 
-function main() {
+async function main() {
   const mapPathArg = parseArg("map");
   const profilePathArg = parseArg("profile");
   const outputPathArg = parseArg("output");
@@ -39,11 +40,16 @@ function main() {
     renderOptions.show_grid = false;
   }
 
-  renderMapSvg(map, renderOptions);
+  const extension = path.extname(outputPath).toLowerCase();
+  if (extension === ".png") {
+    await renderMapPng(map, renderOptions);
+  } else {
+    renderMapSvg(map, renderOptions);
+  }
 
   console.log(JSON.stringify({
     ok: true,
-    event_type: "map_svg_rendered",
+    event_type: extension === ".png" ? "map_png_rendered" : "map_svg_rendered",
     payload: {
       map_path: mapPath,
       profile_path: normalizeProfilePaths(profilePathArg).length > 0
@@ -55,7 +61,10 @@ function main() {
 }
 
 if (require.main === module) {
-  main();
+  main().catch((error) => {
+    console.error(error && error.stack ? error.stack : String(error));
+    process.exit(1);
+  });
 }
 
 module.exports = {

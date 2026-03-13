@@ -1,11 +1,11 @@
 {
-  "map_id": "map-12x12",
-  "map_type": "combat",
-  "name": "Map 12x12 Base Map",
-  "instance_id": "map-instance-12x12",
+  "map_id": "dungeon-map-12x12",
+  "map_type": "dungeon",
+  "name": "Map 12x12 Dungeon Base Map",
+  "instance_id": "dungeon-map-instance-12x12",
   "instance_binding": {
-    "instance_type": "combat",
-    "instance_id": "combat-12x12"
+    "instance_type": "dungeon",
+    "instance_id": "dungeon-12x12"
   },
   "grid": {
     "width": 12,
@@ -13,8 +13,8 @@
     "tile_size": 70
   },
   "asset": {
-    "base_image_path": "apps/map-system/assets/base-maps/map_12x12.png",
-    "terrain_mask_path": "apps/map-system/assets/masks/mask-12x12.png",
+    "base_image_path": "apps/map-system/assets/base-maps/dungeon/map_12x12.png",
+    "terrain_mask_path": "apps/map-system/assets/masks/dungeon/mask-12x12.png",
     "terrain_mask_palette_id": "mspaint_basic",
     "has_embedded_grid": true,
     "render_width_px": 840,

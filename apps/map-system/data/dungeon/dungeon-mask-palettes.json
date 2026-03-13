@@ -1,0 +1,61 @@
+{
+  "palettes": [
+    {
+      "palette_id": "mspaint_dungeon_markers",
+      "name": "MS Paint Dungeon Marker Palette",
+      "description": "Flat-color marker palette for dungeon map overlays and placement hints.",
+      "entries": [
+        {
+          "hex": "#FFFFFF",
+          "marker_type": "open",
+          "label": "Open tile"
+        },
+        {
+          "hex": "#FF0000",
+          "marker_type": "enemy",
+          "label": "Visible enemy"
+        },
+        {
+          "hex": "#EB0000",
+          "marker_type": "enemy",
+          "label": "Visible enemy"
+        },
+        {
+          "hex": "#FFFF00",
+          "marker_type": "party",
+          "label": "Party token"
+        },
+        {
+          "hex": "#EDFF51",
+          "marker_type": "party",
+          "label": "Party token"
+        },
+        {
+          "hex": "#0000FF",
+          "marker_type": "trap",
+          "label": "Trap"
+        },
+        {
+          "hex": "#3F48CC",
+          "marker_type": "trap",
+          "label": "Trap"
+        },
+        {
+          "hex": "#800080",
+          "marker_type": "exit",
+          "label": "Exit"
+        },
+        {
+          "hex": "#A349A4",
+          "marker_type": "exit",
+          "label": "Exit"
+        },
+        {
+          "hex": "#FF00FF",
+          "marker_type": "exit",
+          "label": "Exit"
+        }
+      ]
+    }
+  ]
+}

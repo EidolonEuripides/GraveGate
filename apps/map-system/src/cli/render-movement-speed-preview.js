@@ -14,9 +14,9 @@ function parseArg(name) {
 
 function main() {
   const repoRoot = process.cwd();
-  const mapPathArg = parseArg("map") || "apps/map-system/data/maps/map-12x12.base-map.json";
-  const profilePathArg = parseArg("profile") || "apps/map-system/data/profiles/map-12x12.combat-profile.json";
-  const outputPathArg = parseArg("output") || "apps/map-system/output/map-12x12.movement-speed-preview.svg";
+  const mapPathArg = parseArg("map") || "apps/map-system/data/maps/combat/map-12x12.base-map.json";
+  const profilePathArg = parseArg("profile") || "apps/map-system/data/profiles/combat/map-12x12.combat-profile.json";
+  const outputPathArg = parseArg("output") || "apps/map-system/output/combat/map-12x12.movement-speed-preview.svg";
   const map = loadMapWithProfile({
     map_path: path.resolve(repoRoot, mapPathArg),
     profile_path: profilePathArg ? path.resolve(repoRoot, profilePathArg) : ""

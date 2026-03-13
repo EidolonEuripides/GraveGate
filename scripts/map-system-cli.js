@@ -3,6 +3,7 @@
 const path = require("path");
 const { runMapSystemTests } = require("../apps/map-system/src/testing/mapSystem.test");
 const renderMapCli = require("../apps/map-system/src/cli/render-map");
+const renderMapAsyncCli = require("../apps/map-system/src/cli/render-map-async");
 const renderMovementPreviewCli = require("../apps/map-system/src/cli/render-movement-speed-preview");
 const renderActorMovementPreviewCli = require("../apps/map-system/src/cli/render-actor-movement-preview");
 const applyTerrainMaskCli = require("../apps/map-system/src/cli/apply-terrain-mask");
@@ -23,6 +24,7 @@ const COMMANDS = Object.freeze({
   "apply-terrain-mask": () => applyTerrainMaskCli.main(),
   "inspect-terrain-mask": () => inspectTerrainMaskCli.main(),
   "render-map": () => renderMapCli.main(),
+  "render-map-async": () => renderMapAsyncCli.main(),
   "render-movement-preview": () => renderMovementPreviewCli.main(),
   "render-actor-movement-preview": () => renderActorMovementPreviewCli.main(),
   "process-token": () => processTokenCli.main(),
@@ -43,6 +45,7 @@ async function main() {
       "  apply-terrain-mask",
       "  inspect-terrain-mask",
       "  render-map",
+      "  render-map-async",
       "  render-movement-preview",
       "  render-actor-movement-preview",
       "  process-token",

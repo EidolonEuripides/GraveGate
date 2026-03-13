@@ -3,6 +3,7 @@
 const { ATTACK_MODES, DISTANCE_METRICS, TOKEN_TYPES, MOVEMENT_RULES } = require("../constants");
 const { getDistance } = require("../coordinates/grid");
 const { hasLineOfSight } = require("./range");
+const { getCoverBetween } = require("./cover");
 const { resolveWeaponProfile } = require("./weapon-profiles");
 
 function buildAttackProfile(options) {
@@ -98,6 +99,7 @@ function getValidAttackTargets(options) {
       attack_profile: attackProfile
     }))
     .map((token) => ({
+      cover: getCoverBetween(map, attacker.position, token.position),
       token_id: token.token_id,
       x: token.position.x,
       y: token.position.y,

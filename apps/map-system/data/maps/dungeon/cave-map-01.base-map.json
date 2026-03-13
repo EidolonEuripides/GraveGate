@@ -1,11 +1,11 @@
 {
   "map_id": "cave-map-01",
-  "map_type": "combat",
-  "name": "Cave Map 01 Base Map",
-  "instance_id": "map-instance-cave-01",
+  "map_type": "dungeon",
+  "name": "Cave Map 01 Dungeon Base Map",
+  "instance_id": "dungeon-map-instance-cave-01",
   "instance_binding": {
-    "instance_type": "combat",
-    "instance_id": "combat-cave-01"
+    "instance_type": "dungeon",
+    "instance_id": "dungeon-cave-01"
   },
   "grid": {
     "width": 35,
@@ -13,8 +13,8 @@
     "tile_size": 70
   },
   "asset": {
-    "base_image_path": "apps/map-system/assets/base-maps/cave-map-01.png",
-    "terrain_mask_path": "apps/map-system/assets/masks/cave-mask-01.png",
+    "base_image_path": "apps/map-system/assets/base-maps/dungeon/cave-map-01.png",
+    "terrain_mask_path": "apps/map-system/assets/masks/dungeon/cave-mask-01.png",
     "terrain_mask_palette_id": "mspaint_basic",
     "has_embedded_grid": true,
     "render_width_px": 2450,

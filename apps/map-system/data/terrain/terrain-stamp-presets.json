@@ -75,6 +75,62 @@
       "recommended": {
         "radius": 1
       }
+    },
+    {
+      "preset_id": "mud_patch",
+      "label": "Mud Patch",
+      "default_shape": "circle",
+      "terrain_type": "mud",
+      "recommended": {
+        "radius": 1
+      }
+    },
+    {
+      "preset_id": "rubble_field",
+      "label": "Rubble Field",
+      "default_shape": "rectangle",
+      "terrain_type": "rubble",
+      "recommended": {
+        "width": 2,
+        "height": 2
+      }
+    },
+    {
+      "preset_id": "shallow_water",
+      "label": "Shallow Water",
+      "default_shape": "rectangle",
+      "terrain_type": "shallow_water",
+      "recommended": {
+        "width": 2,
+        "height": 2
+      }
+    },
+    {
+      "preset_id": "fire_patch",
+      "label": "Fire Patch",
+      "default_shape": "circle",
+      "terrain_type": "fire",
+      "recommended": {
+        "radius": 0
+      }
+    },
+    {
+      "preset_id": "acid_pool",
+      "label": "Acid Pool",
+      "default_shape": "circle",
+      "terrain_type": "acid",
+      "recommended": {
+        "radius": 0
+      }
+    },
+    {
+      "preset_id": "spike_trap",
+      "label": "Spike Trap",
+      "default_shape": "circle",
+      "terrain_type": "spikes",
+      "recommended": {
+        "radius": 0
+      }
     }
   ]
 }

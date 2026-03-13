@@ -63,6 +63,20 @@ const SPELL_TARGETING_SHAPES = Object.freeze({
   UTILITY: "utility"
 });
 
+const COVER_LEVELS = Object.freeze({
+  NONE: "none",
+  HALF: "half",
+  THREE_QUARTERS: "three_quarters",
+  TOTAL: "total"
+});
+
+const EDGE_WALL_SIDES = Object.freeze({
+  NORTH: "north",
+  SOUTH: "south",
+  EAST: "east",
+  WEST: "west"
+});
+
 module.exports = {
   MAP_TYPES,
   OVERLAY_KINDS,
@@ -71,5 +85,7 @@ module.exports = {
   MOVEMENT_RULES,
   ATTACK_MODES,
   TARGET_AFFINITIES,
-  SPELL_TARGETING_SHAPES
+  SPELL_TARGETING_SHAPES,
+  COVER_LEVELS,
+  EDGE_WALL_SIDES
 };

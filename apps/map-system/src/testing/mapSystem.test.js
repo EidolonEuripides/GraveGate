@@ -10,6 +10,8 @@ const {
   parseHexColor,
   loadTerrainMaskPalette,
   buildTerrainEntriesFromMaskBitmap,
+  loadDungeonMaskPalette,
+  buildDungeonEntriesFromMaskBitmap,
   listTerrainStampPresets,
   findTerrainStampPreset,
   buildTerrainStampZone,
@@ -19,19 +21,25 @@ const {
   buildRangeOverlay,
   buildPhysicalRangeOverlay,
   buildSpellRangeOverlay,
+  buildHazardOverlay,
   buildSelectionOverlay,
   renderMapSvg,
+  renderMapPng,
+  buildRenderRequest,
   buildAssetLibraryManifest,
   getReachableTiles,
   MOVEMENT_RULES,
   ATTACK_MODES,
+  COVER_LEVELS,
   listWeaponProfiles,
   findWeaponProfile,
   getValidAttackTargets,
+  getCoverBetween,
   buildAttackPreviewState,
   selectAttackTarget,
   hasLineOfSight,
   applyMapProfile,
+  buildHazardTileList,
   getTileProperties,
   resolveActorMovementSpeedFeet,
   inferTerrainTypeFromText,
@@ -50,12 +58,25 @@ const {
   getValidSpellTargets,
   validateSpellSelection,
   getSpellAreaOverlaySpec,
+  getCombatMapSpellSupport,
+  partitionCombatMapSpells,
   buildSpellAreaTiles,
   listActorSpells,
+  listActorCombatMapSpells,
   buildSpellPreviewState,
   selectSpellTarget,
   confirmSpellSelection,
   MAP_ACTION_TYPES,
+  createMoveToCoordinateAction,
+  createAttackTargetTokenAction,
+  createCastSpellAction,
+  createSelectTokenAction,
+  adaptMapActionToCanonicalEvent,
+  DUNGEON_MAP_ACTION_TYPES,
+  createDungeonMapPreviewMoveAction,
+  createDungeonMapMoveDirectionAction,
+  createDungeonMapBackAction,
+  adaptDungeonMapActionToCanonicalEvent,
   INTERACTION_MODES,
   createIdleState,
   handleButtonAction,
@@ -93,6 +114,7 @@ function createTestMap() {
       base_image_path: "apps/map-system/assets/base-maps/test-map.png"
     },
     blocked_tiles: [{ x: 2, y: 1 }],
+    edge_walls: [],
     terrain: [
       { x: 1, y: 1, terrain_type: "brush", movement_cost: 2 },
       { x: 3, y: 1, terrain_type: "tree", blocks_sight: true }
@@ -225,6 +247,42 @@ function runMapSystemTests() {
 
     const keys = reachable.map((tile) => `${tile.x},${tile.y}`);
     assert.equal(keys.includes("1,1"), false);
+  }, results);
+
+  runTest("movement_respects_edge_walls_between_open_tiles", () => {
+    const map = createTestMap();
+    map.blocked_tiles = [];
+    map.terrain = [];
+    map.terrain_zones = [];
+    map.tokens = [
+      {
+        token_id: "hero-1",
+        token_type: "player",
+        label: "H",
+        position: { x: 0, y: 0 }
+      }
+    ];
+    map.edge_walls = [
+      {
+        x: 1,
+        y: 0,
+        side: "west",
+        blocks_movement: true,
+        blocks_sight: true
+      }
+    ];
+
+    const reachable = getReachableTiles({
+      map,
+      origin: { x: 0, y: 0 },
+      max_cost: 5,
+      allow_diagonal: false,
+      ignore_token_id: "hero-1"
+    });
+
+    const keys = reachable.map((tile) => `${tile.x},${tile.y}`);
+    assert.equal(keys.includes("1,0"), false);
+    assert.equal(keys.includes("0,1"), true);
   }, results);
 
   runTest("movement_defaults_to_30_feet", () => {
@@ -487,6 +545,31 @@ function runMapSystemTests() {
     assert.equal(longRangeTargets[0].range_band, "long");
   }, results);
 
+  runTest("attack_targets_report_partial_cover_without_becoming_illegal", () => {
+    const map = createTestMap();
+    map.blocked_tiles = [];
+    map.terrain = [
+      { x: 1, y: 0, terrain_type: "fence" }
+    ];
+    map.terrain_zones = [];
+    map.tokens[1].position = { x: 2, y: 0 };
+
+    const targets = getValidAttackTargets({
+      map,
+      attacker: map.tokens[0],
+      attack_profile: {
+        weapon_name: "Practice Bow",
+        mode: ATTACK_MODES.RANGED_WEAPON,
+        range_feet: 30,
+        long_range_feet: 60
+      }
+    });
+
+    assert.equal(targets.length, 1);
+    assert.equal(targets[0].cover.level, COVER_LEVELS.HALF);
+    assert.equal(targets[0].cover.ac_bonus, 2);
+  }, results);
+
   runTest("attack_target_selection_accepts_valid_token_target", () => {
     const map = createTestMap();
     map.tokens[1].position = { x: 1, y: 0 };
@@ -619,6 +702,40 @@ function runMapSystemTests() {
     assert.equal(getTileProperties(map, { x: 4, y: 0 }).blocks_sight, false);
   }, results);
 
+  runTest("difficult_terrain_and_hazard_flags_are_derived_from_semantic_types", () => {
+    const map = createTestMap();
+    map.terrain = [
+      { x: 1, y: 0, terrain_type: "mud" },
+      { x: 2, y: 0, terrain_type: "fire" }
+    ];
+
+    const mud = getTileProperties(map, { x: 1, y: 0 });
+    const fire = getTileProperties(map, { x: 2, y: 0 });
+    const hazards = buildHazardTileList(map);
+
+    assert.equal(mud.movement_cost, 2);
+    assert.equal(mud.is_hazard, false);
+    assert.equal(fire.is_hazard, true);
+    assert.equal(fire.hazard_kind, "fire");
+    assert.equal(hazards.length, 1);
+    assert.equal(hazards[0].x, 2);
+  }, results);
+
+  runTest("hazard_overlay_marks_semantic_hazard_tiles", () => {
+    const map = createTestMap();
+    map.terrain = [
+      { x: 1, y: 0, terrain_type: "fire" },
+      { x: 2, y: 0, terrain_type: "acid" }
+    ];
+
+    const overlay = buildHazardOverlay({ map });
+
+    assert.equal(overlay.kind, "hazard");
+    assert.equal(overlay.tiles.length, 2);
+    assert.equal(overlay.tiles.some((tile) => tile.label === "FIR"), true);
+    assert.equal(overlay.tiles.some((tile) => tile.label === "ACI"), true);
+  }, results);
+
   runTest("terrain_catalog_infers_impassable_types_from_text_and_assets", () => {
     assert.equal(inferTerrainTypeFromText("tiles/terrain/boulder-large.png"), "boulder");
     assert.equal(inferTerrainTypeFromText("mountain-ridge-01"), "mountain");
@@ -634,6 +751,18 @@ function runMapSystemTests() {
     assert.equal(palette.entries.some((entry) => entry.terrain_type === "wall" && entry.hex === "#000000"), true);
     assert.deepEqual(parseHexColor("#00FF00"), { r: 0, g: 255, b: 0 });
     assert.equal(normalizeHexColor("#ff0000"), "#FF0000");
+  }, results);
+
+  runTest("dungeon_mask_palette_loads_marker_defaults", () => {
+    const palette = loadDungeonMaskPalette({
+      palette_id: "mspaint_dungeon_markers"
+    });
+
+    assert.equal(palette.palette_id, "mspaint_dungeon_markers");
+    assert.equal(palette.entries.some((entry) => entry.marker_type === "party"), true);
+    assert.equal(palette.entries.some((entry) => entry.marker_type === "enemy"), true);
+    assert.equal(palette.entries.some((entry) => entry.marker_type === "trap"), true);
+    assert.equal(palette.entries.some((entry) => entry.marker_type === "exit"), true);
   }, results);
 
   runTest("terrain_mask_bitmap_generates_semantic_terrain_from_flat_colors", () => {
@@ -680,6 +809,40 @@ function runMapSystemTests() {
     assert.equal(out.summary.terrain_type_counts.impassable, 1);
   }, results);
 
+  runTest("terrain_mask_bitmap_detects_thin_black_wall_lines_as_edge_walls", () => {
+    const bitmap = createBitmap(20, 10, { r: 255, g: 255, b: 255, a: 255 });
+    fillBitmapRect(bitmap, { x: 9, y: 0, width: 2, height: 10 }, { r: 0, g: 0, b: 0, a: 255 });
+
+    const map = {
+      map_id: "edge-mask-map",
+      map_type: "combat",
+      grid: {
+        width: 2,
+        height: 1,
+        tile_size: 10
+      },
+      asset: {
+        render_width_px: 20,
+        render_height_px: 10,
+        terrain_mask_palette_id: "mspaint_basic"
+      },
+      blocked_tiles: [],
+      edge_walls: [],
+      terrain: [],
+      terrain_zones: [],
+      tokens: [],
+      overlays: []
+    };
+
+    const out = buildTerrainEntriesFromMaskBitmap(map, bitmap, {});
+    assert.equal(out.terrain.length, 0);
+    assert.equal(out.edge_walls.length, 1);
+    assert.equal(out.edge_walls[0].x, 1);
+    assert.equal(out.edge_walls[0].y, 0);
+    assert.equal(out.edge_walls[0].side, "west");
+    assert.equal(out.summary.generated_edge_walls, 1);
+  }, results);
+
   runTest("terrain_mask_bitmap_center_sampling_ignores_grid_lines", () => {
     const bitmap = createBitmap(20, 20, { r: 255, g: 255, b: 255, a: 255 });
 
@@ -717,6 +880,80 @@ function runMapSystemTests() {
     assert.equal(out.terrain.some((entry) => entry.x === 1 && entry.y === 0), false);
     assert.equal(out.terrain.some((entry) => entry.x === 0 && entry.y === 1), false);
     assert.equal(out.terrain.some((entry) => entry.x === 1 && entry.y === 1 && entry.terrain_type === "brush"), true);
+  }, results);
+
+  runTest("dungeon_mask_bitmap_generates_party_enemy_trap_and_exit_markers", () => {
+    const bitmap = createBitmap(280, 280, { r: 255, g: 255, b: 255, a: 255 });
+    fillBitmapRect(bitmap, { x: 18, y: 18, width: 34, height: 34 }, { r: 255, g: 255, b: 0, a: 255 });
+    fillBitmapRect(bitmap, { x: 88, y: 18, width: 34, height: 34 }, { r: 255, g: 0, b: 0, a: 255 });
+    fillBitmapRect(bitmap, { x: 18, y: 88, width: 34, height: 34 }, { r: 0, g: 0, b: 255, a: 255 });
+    fillBitmapRect(bitmap, { x: 158, y: 18, width: 34, height: 34 }, { r: 128, g: 0, b: 128, a: 255 });
+
+    const map = {
+      map_id: "dungeon-mask-map",
+      map_type: "dungeon",
+      grid: {
+        width: 4,
+        height: 4,
+        tile_size: 70
+      },
+      asset: {
+        render_width_px: 280,
+        render_height_px: 280,
+        dungeon_mask_palette_id: "mspaint_dungeon_markers"
+      },
+      blocked_tiles: [],
+      terrain: [],
+      terrain_zones: [],
+      tokens: [],
+      overlays: []
+    };
+
+    const out = buildDungeonEntriesFromMaskBitmap(map, bitmap, {});
+    assert.deepEqual(out.party_position, { x: 0, y: 0 });
+    assert.equal(out.visible_enemy_tokens.length, 1);
+    assert.deepEqual(out.visible_enemy_tokens[0].position, { x: 1, y: 0 });
+    assert.equal(out.objects.length, 1);
+    assert.equal(out.objects[0].object_type, "trap");
+    assert.deepEqual(out.objects[0].position, { x: 0, y: 1 });
+    assert.equal(out.exits.length, 1);
+    assert.equal(out.exits[0].direction, "north");
+    assert.deepEqual(out.exits[0].position, { x: 2, y: 0 });
+  }, results);
+
+  runTest("mask_driven_12x10_profile_persists_edge_walls_and_blocks_cross_wall_sight", () => {
+    const loaded = loadMapWithProfile({
+      map_path: path.resolve(process.cwd(), "apps/map-system/data/maps/combat/map-12x10.base-map.json"),
+      profile_path: [
+        path.resolve(process.cwd(), "apps/map-system/data/profiles/combat/map-12x10.combat-profile.json")
+      ]
+    });
+
+    assert.equal(Array.isArray(loaded.edge_walls), true);
+    assert.equal(loaded.edge_walls.length > 0, true);
+    assert.equal(hasLineOfSight(loaded, { x: 5, y: 1 }, { x: 6, y: 1 }), false);
+  }, results);
+
+  runTest("mask_driven_12x10_movement_preview_respects_authored_wall_tiles", () => {
+    const loaded = loadMapWithProfile({
+      map_path: path.resolve(process.cwd(), "apps/map-system/data/maps/combat/map-12x10.base-map.json"),
+      profile_path: [
+        path.resolve(process.cwd(), "apps/map-system/data/profiles/combat/map-12x10.combat-profile.json"),
+        path.resolve(process.cwd(), "apps/map-system/data/profiles/combat/map-12x10.movement-preview.json")
+      ]
+    });
+    const actor = loaded.tokens.find((token) => token.token_id === "movement-player-12x10");
+    const reachable = getReachableTiles({
+      map: loaded,
+      origin: actor.position,
+      max_cost: actor.movement_speed_feet,
+      allow_diagonal: true,
+      diagonal_rule: loaded.rules.diagonal_rule,
+      ignore_token_id: actor.token_id
+    });
+
+    assert.equal(reachable.some((tile) => tile.x === 2 && tile.y === 5), false);
+    assert.equal(reachable.some((tile) => tile.x === 3 && tile.y === 6), false);
   }, results);
 
   runTest("terrain_zones_infer_default_flags_from_semantic_type", () => {
@@ -970,6 +1207,64 @@ function runMapSystemTests() {
     assert.equal(targets[0].token_id, "enemy-1");
   }, results);
 
+  runTest("cover_between_tokens_reports_total_cover_when_line_of_sight_is_broken", () => {
+    const map = createTestMap();
+    map.blocked_tiles = [];
+    map.terrain = [
+      { x: 1, y: 0, terrain_type: "wall" }
+    ];
+    map.terrain_zones = [];
+
+    const cover = getCoverBetween(map, { x: 0, y: 0 }, { x: 2, y: 0 });
+    assert.equal(cover.level, COVER_LEVELS.TOTAL);
+  }, results);
+
+  runTest("line_of_sight_and_targeting_respect_edge_walls", () => {
+    const map = createTestMap();
+    map.blocked_tiles = [];
+    map.terrain = [];
+    map.terrain_zones = [];
+    map.tokens[0].team = "heroes";
+    map.tokens[1].team = "monsters";
+    map.tokens[1].position = { x: 1, y: 0 };
+    map.edge_walls = [
+      {
+        x: 1,
+        y: 0,
+        side: "west",
+        blocks_movement: true,
+        blocks_sight: true
+      }
+    ];
+
+    const profile = buildSpellTargetingProfile({
+      spell_id: "fire_bolt",
+      name: "Fire Bolt",
+      range: "120 feet",
+      targeting: { type: "single_target" }
+    });
+
+    const spellTargets = getValidSpellTargets({
+      map,
+      actor: map.tokens[0],
+      profile
+    });
+
+    const attackTargets = getValidAttackTargets({
+      map,
+      attacker: map.tokens[0],
+      attack_profile: {
+        mode: ATTACK_MODES.RANGED_WEAPON,
+        range_feet: 30,
+        long_range_feet: 30
+      }
+    });
+
+    assert.equal(hasLineOfSight(map, map.tokens[0].position, map.tokens[1].position), false);
+    assert.equal(spellTargets.length, 0);
+    assert.equal(attackTargets.length, 0);
+  }, results);
+
   runTest("healing_spells_target_allies", () => {
     const map = createTestMap();
     map.tokens[0].team = "heroes";
@@ -1109,6 +1404,49 @@ function runMapSystemTests() {
     assert.equal(listed[0].spell_id, "fire_bolt");
   }, results);
 
+  runTest("combat_map_spell_support_filters_to_supported_action_spells", () => {
+    const spells = [
+      { spell_id: "fire_bolt", name: "Fire Bolt", level: 0, casting_time: "1 action", range: "120 feet", targeting: { type: "single_target" } },
+      { spell_id: "bless", name: "Bless", level: 1, casting_time: "1 action", range: "30 feet", targeting: { type: "up_to_three_allies" } },
+      { spell_id: "shield", name: "Shield", level: 1, casting_time: "1 reaction", range: "self", targeting: { type: "self" } },
+      { spell_id: "light", name: "Light", level: 0, casting_time: "1 action", range: "touch", targeting: { type: "object" } }
+    ];
+    const actor = {
+      known_spell_ids: ["fire_bolt", "bless", "shield", "light"]
+    };
+
+    const partition = listActorCombatMapSpells({ actor, spells });
+
+    assert.deepEqual(partition.supported.map((entry) => entry.spell_id), ["fire_bolt"]);
+    assert.equal(partition.unsupported.length, 3);
+    assert.equal(partition.unsupported.some((entry) => entry.name === "Bless"), true);
+  }, results);
+
+  runTest("combat_map_spell_support_reports_reasons_for_unsupported_spells", () => {
+    const blessSupport = getCombatMapSpellSupport({
+      spell_id: "bless",
+      name: "Bless",
+      casting_time: "1 action",
+      targeting: { type: "up_to_three_allies" }
+    });
+    const shieldSupport = getCombatMapSpellSupport({
+      spell_id: "shield",
+      name: "Shield",
+      casting_time: "1 reaction",
+      targeting: { type: "self" }
+    });
+    const partition = partitionCombatMapSpells([
+      { spell_id: "fire_bolt", name: "Fire Bolt", casting_time: "1 action", targeting: { type: "single_target" } },
+      { spell_id: "shield", name: "Shield", casting_time: "1 reaction", targeting: { type: "self" } }
+    ]);
+
+    assert.equal(blessSupport.supported, false);
+    assert.equal(String(blessSupport.reason).includes("supported map-mode spell slice"), true);
+    assert.equal(shieldSupport.supported, false);
+    assert.equal(String(shieldSupport.reason).includes("1-action combat spells"), true);
+    assert.deepEqual(partition.supported.map((entry) => entry.spell_id), ["fire_bolt"]);
+  }, results);
+
   runTest("spell_preview_state_returns_targets_and_area_spec", () => {
     const map = createTestMap();
     map.tokens[0].team = "heroes";
@@ -1133,6 +1471,27 @@ function runMapSystemTests() {
     assert.equal(out.payload.valid_targets.length, 1);
     assert.equal(out.payload.spell_name, "Fire Bolt");
     assert.equal(out.payload.overlays.length, 1);
+  }, results);
+
+  runTest("spell_preview_state_rejects_unsupported_map_mode_spells", () => {
+    const map = createTestMap();
+    const out = buildSpellPreviewState({
+      map,
+      actor: map.tokens[0],
+      spells: [
+        {
+          spell_id: "bless",
+          name: "Bless",
+          casting_time: "1 action",
+          range: "30 feet",
+          targeting: { type: "up_to_three_allies" }
+        }
+      ],
+      spell_id: "bless"
+    });
+
+    assert.equal(out.ok, false);
+    assert.equal(String(out.error).includes("supported map-mode spell slice"), true);
   }, results);
 
   runTest("spell_preview_state_builds_area_overlay_tiles_for_targeted_aoe", () => {
@@ -1376,9 +1735,8 @@ function runMapSystemTests() {
     });
 
     assert.equal(payload.message_id, "message-1");
-    assert.equal(payload.components.length, 2);
-    assert.equal(payload.components[0].components.length, 5);
-    assert.equal(payload.components[1].components.length, 1);
+  assert.equal(payload.components.length, 1);
+  assert.equal(payload.components[0].components.length, 4);
     assert.equal(payload.content.includes("Turn: P1"), true);
     assert.equal(payload.content.includes("Mode: Ready"), true);
   }, results);
@@ -2082,6 +2440,123 @@ function runMapSystemTests() {
 
     assert.equal(attack.action_contract.action_type, MAP_ACTION_TYPES.ATTACK_TARGET_TOKEN);
     assert.equal(spell.action_contract.action_type, MAP_ACTION_TYPES.CAST_SPELL);
+  }, results);
+
+  runTest("map_action_adapter_builds_canonical_combat_events_without_mutating_state", () => {
+    const moveResult = adaptMapActionToCanonicalEvent(createMoveToCoordinateAction({
+      actor_id: "actor-1",
+      instance_id: "combat-1",
+      instance_type: "combat",
+      map_id: "map-1"
+    }, { x: 3, y: 4 }), {
+      player_id: "player-1"
+    });
+    const attackResult = adaptMapActionToCanonicalEvent(createAttackTargetTokenAction({
+      actor_id: "actor-1",
+      instance_id: "combat-1",
+      instance_type: "combat",
+      map_id: "map-1"
+    }, "enemy-1", {
+      selected_target_position: { x: 1, y: 0 },
+      attack_profile: { weapon_profile_id: "longsword" }
+    }), {
+      player_id: "player-1"
+    });
+    const spellResult = adaptMapActionToCanonicalEvent(createCastSpellAction({
+      actor_id: "actor-1",
+      instance_id: "combat-1",
+      instance_type: "combat",
+      map_id: "map-1"
+    }, {
+      spell_id: "fire_bolt",
+      selected_targets: [{ token_id: "enemy-1" }],
+      target_position: { x: 1, y: 0 }
+    }), {
+      player_id: "player-1"
+    });
+
+    assert.equal(moveResult.ok, true);
+    assert.equal(moveResult.payload.event.event_type, "player_move");
+    assert.equal(moveResult.payload.event.payload.target_x, 3);
+    assert.equal(attackResult.payload.event.event_type, "player_attack");
+    assert.equal(attackResult.payload.event.payload.target_id, "enemy-1");
+    assert.equal(spellResult.payload.event.event_type, "player_cast_spell");
+    assert.equal(spellResult.payload.event.payload.spell_id, "fire_bolt");
+  }, results);
+
+  runTest("map_action_adapter_keeps_non_gameplay_token_selection_local", () => {
+    const result = adaptMapActionToCanonicalEvent(createSelectTokenAction({
+      actor_id: "actor-1",
+      instance_id: "combat-1",
+      instance_type: "combat",
+      map_id: "map-1"
+    }, {
+      token_choice_id: "male-tiefling-03"
+    }), {
+      player_id: "player-1"
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.payload.dispatch_required, false);
+    assert.equal(result.payload.event, null);
+  }, results);
+
+  runTest("dungeon_map_action_adapter_dispatches_move_direction_as_canonical_session_event", () => {
+    const result = adaptDungeonMapActionToCanonicalEvent(createDungeonMapMoveDirectionAction({
+      actor_id: "leader-1",
+      instance_id: "session-1",
+      instance_type: "dungeon",
+      map_id: "dungeon-map-1"
+    }, "east"), {
+      player_id: "player-1"
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.payload.dispatch_required, true);
+    assert.equal(result.payload.event.event_type, "player_move");
+    assert.equal(result.payload.event.target_system, "session_system");
+    assert.equal(result.payload.event.payload.direction, "east");
+    assert.equal(result.payload.event.session_id, "session-1");
+  }, results);
+
+  runTest("dungeon_map_action_adapter_keeps_preview_and_back_local", () => {
+    const preview = adaptDungeonMapActionToCanonicalEvent(createDungeonMapPreviewMoveAction({
+      actor_id: "leader-1",
+      instance_id: "session-1",
+      instance_type: "dungeon",
+      map_id: "dungeon-map-1"
+    }), {
+      player_id: "player-1"
+    });
+    const back = adaptDungeonMapActionToCanonicalEvent(createDungeonMapBackAction({
+      actor_id: "leader-1",
+      instance_id: "session-1",
+      instance_type: "dungeon",
+      map_id: "dungeon-map-1"
+    }), {
+      player_id: "player-1"
+    });
+
+    assert.equal(preview.ok, true);
+    assert.equal(preview.payload.dispatch_required, false);
+    assert.equal(preview.payload.event, null);
+    assert.equal(preview.payload.action.action_type, DUNGEON_MAP_ACTION_TYPES.PREVIEW_MOVE);
+    assert.equal(back.ok, true);
+    assert.equal(back.payload.dispatch_required, false);
+    assert.equal(back.payload.event, null);
+    assert.equal(back.payload.action.action_type, DUNGEON_MAP_ACTION_TYPES.BACK);
+  }, results);
+
+  runTest("map_render_request_builder_normalizes_output_path_for_worker_use", () => {
+    const request = buildRenderRequest({
+      map: createTestMap(),
+      output_path: "apps/map-system/output/test-render.png",
+      show_grid: false
+    });
+
+    assert.equal(Boolean(request.map), true);
+    assert.equal(path.isAbsolute(request.render_options.output_path), true);
+    assert.equal(request.render_options.show_grid, false);
   }, results);
 
   runTest("svg_renderer_writes_snapshot", () => {

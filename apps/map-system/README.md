@@ -108,15 +108,16 @@ Important authoring rules:
 
 Recommended mask file location:
 
-- `apps/map-system/assets/masks/`
+- `apps/map-system/assets/masks/combat/`
+- `apps/map-system/assets/masks/dungeon/`
 
 Add the mask to your base map JSON like this:
 
 ```json
 {
   "asset": {
-    "base_image_path": "apps/map-system/assets/base-maps/my-map.png",
-    "terrain_mask_path": "apps/map-system/assets/masks/my-map.mask.png",
+    "base_image_path": "apps/map-system/assets/base-maps/combat/my-map.png",
+    "terrain_mask_path": "apps/map-system/assets/masks/combat/my-map.mask.png",
     "terrain_mask_palette_id": "mspaint_basic"
   }
 }
@@ -136,13 +137,13 @@ Current `mspaint_basic` palette:
 Process the mask into a profile:
 
 ```powershell
-node scripts/map-system-cli.js apply-terrain-mask --map=apps/map-system/data/maps/my-map.base-map.json --profile=apps/map-system/data/profiles/my-map.combat-profile.json
+node scripts/map-system-cli.js apply-terrain-mask --map=apps/map-system/data/maps/combat/my-map.base-map.json --profile=apps/map-system/data/profiles/combat/my-map.combat-profile.json
 ```
 
 Inspect what the mask generated without editing files:
 
 ```powershell
-node scripts/map-system-cli.js inspect-terrain-mask --map=apps/map-system/data/maps/my-map.base-map.json --profile=apps/map-system/data/profiles/my-map.combat-profile.json
+node scripts/map-system-cli.js inspect-terrain-mask --map=apps/map-system/data/maps/combat/my-map.base-map.json --profile=apps/map-system/data/profiles/combat/my-map.combat-profile.json
 ```
 
 The terrain-mask CLI preserves manual profile terrain entries and replaces only terrain entries that were previously generated from the mask.
@@ -152,7 +153,7 @@ When rendering previews, you can layer multiple profiles by passing a comma-sepa
 Example:
 
 ```powershell
-node apps/map-system/src/cli/render-map.js --map=apps/map-system/data/maps/map-12x10.base-map.json --profile=apps/map-system/data/profiles/map-12x10.combat-profile.json,apps/map-system/data/profiles/map-12x10.movement-preview.json --output=apps/map-system/output/map-12x10.movement-preview.svg
+node apps/map-system/src/cli/render-map.js --map=apps/map-system/data/maps/combat/map-12x10.base-map.json --profile=apps/map-system/data/profiles/combat/map-12x10.combat-profile.json,apps/map-system/data/profiles/combat/map-12x10.movement-preview.json --output=apps/map-system/output/combat/map-12x10.movement-preview.svg
 ```
 
 ## Terrain Stamping Workflow
@@ -161,7 +162,7 @@ Use the terrain stamping CLI to add semantic obstacle zones to a combat profile 
 
 ```powershell
 node apps/map-system/src/cli/stamp-terrain.js --list-presets=true
-node apps/map-system/src/cli/stamp-terrain.js --profile=apps/map-system/data/profiles/my-map.combat-profile.json --preset=tree_cluster --x=8 --y=13 --radius=1 --zone-id=west-mid-tree-cluster
+node apps/map-system/src/cli/stamp-terrain.js --profile=apps/map-system/data/profiles/combat/my-map.combat-profile.json --preset=tree_cluster --x=8 --y=13 --radius=1 --zone-id=west-mid-tree-cluster
 ```
 
 This workflow is intended to be the default way you author things like:
@@ -178,8 +179,8 @@ This workflow is intended to be the default way you author things like:
 
 The cleanest included combat profiles to build from now are:
 
-- `apps/map-system/data/profiles/map-12x10.combat-profile.json`
-- `apps/map-system/data/profiles/cave-map-01.combat-profile.json`
+- `apps/map-system/data/profiles/combat/map-12x10.combat-profile.json`
+- `apps/map-system/data/profiles/dungeon/cave-map-01.dungeon-profile.json`
 
 These exist specifically to keep terrain authoring and token placement debugging grounded on clean, mask-driven maps instead of painterly art.
 
@@ -189,7 +190,8 @@ This repository does not currently include a Node PNG rendering dependency. The 
 
 ## Suggested Asset Placement
 
-- Base maps: `apps/map-system/assets/base-maps/`
+- Combat base maps: `apps/map-system/assets/base-maps/combat/`
+- Dungeon base maps: `apps/map-system/assets/base-maps/dungeon/`
 - Tile pieces for procedural generation: `apps/map-system/assets/tiles/`
 - Token art: `apps/map-system/assets/tokens/`
 - Reusable overlay art: `apps/map-system/assets/overlays/`
@@ -198,20 +200,22 @@ This repository does not currently include a Node PNG rendering dependency. The 
 
 The included clean control maps are:
 
-- `apps/map-system/data/maps/map-12x12.base-map.json`
-- `apps/map-system/data/maps/map-12x10.base-map.json`
-- `apps/map-system/data/maps/cave-map-01.base-map.json`
+- `apps/map-system/data/maps/combat/map-12x12.base-map.json`
+- `apps/map-system/data/maps/combat/map-12x10.base-map.json`
+- `apps/map-system/data/maps/dungeon/cave-map-01.base-map.json`
 
 ## Render Demo
 
 ```powershell
-node apps/map-system/src/cli/render-map.js --map=apps/map-system/data/maps/map-12x10.base-map.json --profile=apps/map-system/data/profiles/map-12x10.combat-profile.json,apps/map-system/data/profiles/map-12x10.movement-preview.json --output=apps/map-system/output/map-12x10.movement-preview.svg
+node apps/map-system/src/cli/render-map.js --map=apps/map-system/data/maps/combat/map-12x10.base-map.json --profile=apps/map-system/data/profiles/combat/map-12x10.combat-profile.json,apps/map-system/data/profiles/combat/map-12x10.movement-preview.json --output=apps/map-system/output/combat/map-12x10.movement-preview.svg
 ```
 
 ## Authoring Pattern
 
-- `data/maps/*.base-map.json` stores the reusable base map definition
-- `data/profiles/*.json` stores obstacle annotations, tokens, and scenario overlays
+- `data/maps/combat/*.base-map.json` stores reusable combat base maps
+- `data/maps/dungeon/*.base-map.json` stores reusable dungeon base maps
+- `data/profiles/combat/*.json` stores combat obstacle annotations, tokens, and scenario overlays
+- `data/profiles/dungeon/*.json` stores dungeon obstacle annotations, tokens, and scenario overlays
 
 That split lets you reuse one map image for many combats without duplicating the whole map file every time.
 
@@ -437,7 +441,7 @@ node scripts/map-system-cli.js test
 To render a comparison snapshot showing one actor at `30 feet` of movement and one actor at `15 feet`:
 
 ```powershell
-node apps/map-system/src/cli/render-movement-speed-preview.js --map=apps/map-system/data/maps/map-12x12.base-map.json --output=apps/map-system/output/map-12x12.movement-speed-preview.svg
+node apps/map-system/src/cli/render-movement-speed-preview.js --map=apps/map-system/data/maps/combat/map-12x12.base-map.json --output=apps/map-system/output/combat/map-12x12.movement-speed-preview.svg
 ```
 
 The root package also exposes matching convenience scripts:

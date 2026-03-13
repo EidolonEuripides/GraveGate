@@ -21,6 +21,11 @@ function buildDefinitionIndex() {
       blocks_movement: definition.blocks_movement === true,
       blocks_sight: definition.blocks_sight === true,
       movement_cost: typeof definition.movement_cost === "number" ? definition.movement_cost : 1,
+      cover_level: normalizeTerrainType(definition.cover_level),
+      is_hazard: definition.is_hazard === true,
+      hazard_kind: normalizeTerrainType(definition.hazard_kind),
+      damages_on_enter: definition.damages_on_enter === true,
+      damages_on_turn_start: definition.damages_on_turn_start === true,
       aliases: Array.isArray(definition.aliases) ? definition.aliases.map(normalizeTerrainType) : []
     });
   });

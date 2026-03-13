@@ -125,31 +125,9 @@ function buildMapActionRow(options) {
     {
       type: 2,
       style: 2,
-      label: "Item",
-      custom_id: buildMapButtonCustomId({
-        action: MAP_BUTTON_ACTIONS.ITEM,
-        actor_id: actorId,
-        instance_type: instanceType,
-        instance_id: instanceId
-      })
-    },
-    {
-      type: 2,
-      style: 2,
       label: "Token",
       custom_id: buildMapButtonCustomId({
         action: MAP_BUTTON_ACTIONS.TOKEN,
-        actor_id: actorId,
-        instance_type: instanceType,
-        instance_id: instanceId
-      })
-    },
-    {
-      type: 2,
-      style: 2,
-      label: "End Turn",
-      custom_id: buildMapButtonCustomId({
-        action: MAP_BUTTON_ACTIONS.END_TURN,
         actor_id: actorId,
         instance_type: instanceType,
         instance_id: instanceId
@@ -374,12 +352,20 @@ function buildSpellSelectionRows(options) {
 
 function buildSpellSelectionMessagePayload(options) {
   const pageInfo = paginateEntries(options.spells || [], options.page, options.page_size);
+  const unsupported = Array.isArray(options.unsupported_spells) ? options.unsupported_spells : [];
+  const unsupportedNames = unsupported.slice(0, 5).map((entry) => entry.name).filter(Boolean);
   return {
     content: options.content || buildModeSummary({
-      title: "Choose a spell.",
+      title: (options.spells || []).length > 0 ? "Choose a spell." : "No supported map-mode spells.",
       turn_label: options.turn_label || "",
       mode_label: "Spell Selection",
-      page_summary: pageInfo.total_pages > 1 ? `Page ${pageInfo.current_page}/${pageInfo.total_pages}` : ""
+      selection_summary: unsupported.length > 0
+        ? `Unsupported in map mode: ${unsupportedNames.join(", ")}${unsupported.length > unsupportedNames.length ? ", ..." : ""}`
+        : "",
+      page_summary: pageInfo.total_pages > 1 ? `Page ${pageInfo.current_page}/${pageInfo.total_pages}` : "",
+      hint: unsupported.length > 0 && (options.spells || []).length > 0
+        ? "Only the currently supported combat-map spell slice is shown here."
+        : ""
     }),
     files: options.files || [],
     components: buildSpellSelectionRows(options)

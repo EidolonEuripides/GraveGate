@@ -163,11 +163,12 @@ Important data/config:
 - `apps/map-system/data/tokens/enemy-token-catalog.json`
 
 New control-test maps:
-- `apps/map-system/data/maps/map-12x12.base-map.json`
-- `apps/map-system/data/maps/map-12x10.base-map.json`
-- `apps/map-system/data/profiles/map-12x12.alignment-preview.json`
-- `apps/map-system/data/profiles/map-12x10.combat-profile.json`
-- `apps/map-system/data/profiles/map-12x10.movement-preview.json`
+- `apps/map-system/data/maps/combat/map-12x12.base-map.json`
+- `apps/map-system/data/maps/combat/map-12x10.base-map.json`
+- `apps/map-system/data/maps/dungeon/cave-map-01.base-map.json`
+- `apps/map-system/data/profiles/combat/map-12x12.alignment-preview.json`
+- `apps/map-system/data/profiles/combat/map-12x10.combat-profile.json`
+- `apps/map-system/data/profiles/combat/map-12x10.movement-preview.json`
 
 
 7) Recent Fixes

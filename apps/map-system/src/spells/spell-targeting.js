@@ -3,6 +3,7 @@
 const { MOVEMENT_RULES, SPELL_TARGETING_SHAPES, TARGET_AFFINITIES, TOKEN_TYPES } = require("../constants");
 const { getDistance } = require("../coordinates/grid");
 const { hasLineOfSight } = require("../logic/range");
+const { getCoverBetween } = require("../logic/cover");
 
 function parseFeet(value, fallback) {
   const text = String(value || "").trim().toLowerCase();
@@ -156,7 +157,8 @@ function getValidSpellTargets(options) {
       token_id: token.token_id,
       x: token.position.x,
       y: token.position.y,
-      distance_feet: getTokenDistanceFeet(actor, token)
+      distance_feet: getTokenDistanceFeet(actor, token),
+      cover: getCoverBetween(map, actor.position, token.position)
     }));
 }
 

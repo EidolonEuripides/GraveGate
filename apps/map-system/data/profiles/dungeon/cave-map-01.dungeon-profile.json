@@ -1,5 +1,5 @@
 {
-  "name": "Cave Map 01 Combat Profile",
+  "name": "Cave Map 01 Dungeon Profile",
   "terrain": [
     {
       "x": 0,
@@ -1343,6 +1343,6 @@
     "terrain_type_counts": {
       "wall": 190
     },
-    "mask_path": "apps/map-system/assets/masks/cave-mask-01.png"
+    "mask_path": "apps/map-system/assets/masks/dungeon/cave-mask-01.png"
   }
 }

@@ -1,6 +1,6 @@
 "use strict";
 
-const { MAP_TYPES, OVERLAY_KINDS, TOKEN_TYPES } = require("../constants");
+const { MAP_TYPES, OVERLAY_KINDS, TOKEN_TYPES, EDGE_WALL_SIDES } = require("../constants");
 
 function isInteger(value) {
   return Number.isInteger(value);
@@ -144,6 +144,36 @@ function validateTerrainZones(zones, errors) {
   });
 }
 
+function validateEdgeWalls(edgeWalls, errors) {
+  if (!Array.isArray(edgeWalls)) {
+    errors.push("edge_walls must be an array");
+    return;
+  }
+
+  edgeWalls.forEach((entry, index) => {
+    if (!entry || typeof entry !== "object") {
+      errors.push(`edge_walls[${index}] must be an object`);
+      return;
+    }
+
+    if (!isInteger(entry.x) || !isInteger(entry.y)) {
+      errors.push(`edge_walls[${index}] must include integer x and y`);
+    }
+
+    if (!Object.values(EDGE_WALL_SIDES).includes(entry.side)) {
+      errors.push(`edge_walls[${index}].side must be a known edge side`);
+    }
+
+    if (entry.blocks_movement !== undefined && typeof entry.blocks_movement !== "boolean") {
+      errors.push(`edge_walls[${index}].blocks_movement must be boolean`);
+    }
+
+    if (entry.blocks_sight !== undefined && typeof entry.blocks_sight !== "boolean") {
+      errors.push(`edge_walls[${index}].blocks_sight must be boolean`);
+    }
+  });
+}
+
 function validateMapStateShape(map) {
   const errors = [];
 
@@ -176,6 +206,7 @@ function validateMapStateShape(map) {
   validateCoordinates(map.blocked_tiles || [], "blocked_tiles", errors);
   validateTerrain(map.terrain || [], errors);
   validateTerrainZones(map.terrain_zones || [], errors);
+  validateEdgeWalls(map.edge_walls || [], errors);
   validateTokens(map.tokens || [], errors);
   validateOverlays(map.overlays || [], errors);
 

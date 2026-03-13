@@ -44,6 +44,11 @@ function mergeUniqueByCoordinate(primaryList, secondaryList) {
   return Array.from(merged.values());
 }
 
+function mergeUniqueByEdgeKey(primaryList, secondaryList, grid) {
+  const { mergeUniqueEdgeWalls } = require("../logic/edge-walls");
+  return mergeUniqueEdgeWalls(primaryList, secondaryList, grid);
+}
+
 function loadTerrainMaskPalette(options) {
   const paletteId = options && options.palette_id
     ? String(options.palette_id)
@@ -172,6 +177,95 @@ function sampleTileMaskEntry(bitmap, metrics, tile, palette, tolerance) {
   return ranked.length > 0 ? ranked[0].entry : null;
 }
 
+function sampleMaskEntryAtPoints(bitmap, samplePoints, palette, tolerance) {
+  const counts = new Map();
+
+  samplePoints.forEach((point) => {
+    const pixel = getBitmapPixel(bitmap, point.x, point.y);
+    if (pixel.a === 0) {
+      return;
+    }
+
+    const match = matchPaletteEntry(pixel, palette, tolerance);
+    if (!match) {
+      return;
+    }
+
+    const key = `${match.hex}:${match.terrain_type}`;
+    counts.set(key, {
+      count: (counts.get(key) ? counts.get(key).count : 0) + 1,
+      entry: match
+    });
+  });
+
+  const ranked = Array.from(counts.values()).sort((left, right) => right.count - left.count);
+  return ranked.length > 0 ? ranked[0].entry : null;
+}
+
+function buildEdgeWallsFromMaskBitmap(map, bitmap, palette, tolerance, metrics) {
+  const edgeWalls = [];
+  const offsetX = Math.max(1, Math.floor(metrics.tile_width_px * 0.16));
+  const offsetY = Math.max(1, Math.floor(metrics.tile_height_px * 0.16));
+
+  for (let y = 0; y < map.grid.height; y += 1) {
+    for (let x = 1; x < map.grid.width; x += 1) {
+      const boundaryX = metrics.grid_origin_x + (x * metrics.tile_width_px);
+      const centerY = metrics.grid_origin_y + ((y + 0.5) * metrics.tile_height_px);
+      const match = sampleMaskEntryAtPoints(bitmap, [
+        { x: Math.round(boundaryX), y: Math.round(centerY) },
+        { x: Math.round(boundaryX), y: Math.round(centerY - offsetY) },
+        { x: Math.round(boundaryX), y: Math.round(centerY + offsetY) }
+      ], palette, tolerance);
+
+      if (!match || match.terrain_type !== "wall") {
+        continue;
+      }
+
+      edgeWalls.push({
+        x,
+        y,
+        side: "west",
+        terrain_type: "wall",
+        mask_color: match.hex,
+        mask_generated: true,
+        edge_generated: true,
+        blocks_movement: true,
+        blocks_sight: true
+      });
+    }
+  }
+
+  for (let y = 1; y < map.grid.height; y += 1) {
+    for (let x = 0; x < map.grid.width; x += 1) {
+      const boundaryY = metrics.grid_origin_y + (y * metrics.tile_height_px);
+      const centerX = metrics.grid_origin_x + ((x + 0.5) * metrics.tile_width_px);
+      const match = sampleMaskEntryAtPoints(bitmap, [
+        { x: Math.round(centerX), y: Math.round(boundaryY) },
+        { x: Math.round(centerX - offsetX), y: Math.round(boundaryY) },
+        { x: Math.round(centerX + offsetX), y: Math.round(boundaryY) }
+      ], palette, tolerance);
+
+      if (!match || match.terrain_type !== "wall") {
+        continue;
+      }
+
+      edgeWalls.push({
+        x,
+        y,
+        side: "north",
+        terrain_type: "wall",
+        mask_color: match.hex,
+        mask_generated: true,
+        edge_generated: true,
+        blocks_movement: true,
+        blocks_sight: true
+      });
+    }
+  }
+
+  return mergeUniqueByEdgeKey(edgeWalls, [], map.grid);
+}
+
 function buildTerrainEntriesFromMaskBitmap(map, bitmap, options) {
   const palette = loadTerrainMaskPalette({
     palette_id: options && options.palette_id
@@ -188,6 +282,7 @@ function buildTerrainEntriesFromMaskBitmap(map, bitmap, options) {
       : 24);
   const metrics = getTerrainMaskMetrics(map, bitmap);
   const terrain = [];
+  const edgeWalls = [];
   const counts = {};
   let unmatchedTiles = 0;
 
@@ -214,12 +309,17 @@ function buildTerrainEntriesFromMaskBitmap(map, bitmap, options) {
     }
   }
 
+  const builtEdgeWalls = buildEdgeWallsFromMaskBitmap(map, bitmap, palette, tolerance, metrics);
+  builtEdgeWalls.forEach((entry) => edgeWalls.push(entry));
+
   return {
     terrain,
+    edge_walls: edgeWalls,
     summary: {
       palette_id: palette.palette_id,
       tile_count: map.grid.width * map.grid.height,
       generated_terrain_tiles: terrain.length,
+      generated_edge_walls: edgeWalls.length,
       unmatched_tiles: unmatchedTiles,
       terrain_type_counts: counts
     }
@@ -248,6 +348,7 @@ async function buildTerrainEntriesFromMaskPath(map, options) {
 
   return {
     terrain: built.terrain,
+    edge_walls: built.edge_walls,
     summary: {
       ...built.summary,
       mask_path: resolvedMaskPath
@@ -263,6 +364,7 @@ async function applyTerrainMaskToMap(map, options) {
 
   const nextMap = clone(map);
   nextMap.terrain = mergeUniqueByCoordinate(built.terrain, nextMap.terrain || []);
+  nextMap.edge_walls = mergeUniqueByEdgeKey(built.edge_walls, nextMap.edge_walls || [], map.grid);
   nextMap.terrain_mask_summary = built.summary;
   return nextMap;
 }

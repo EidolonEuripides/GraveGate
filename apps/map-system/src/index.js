@@ -1,6 +1,6 @@
 "use strict";
 
-const { MAP_TYPES, OVERLAY_KINDS, TOKEN_TYPES, DISTANCE_METRICS, MOVEMENT_RULES, ATTACK_MODES } = require("./constants");
+const { MAP_TYPES, OVERLAY_KINDS, TOKEN_TYPES, DISTANCE_METRICS, MOVEMENT_RULES, ATTACK_MODES, COVER_LEVELS, EDGE_WALL_SIDES } = require("./constants");
 const { validateMapStateShape, assertValidMapState } = require("./schema/map-state.schema");
 const { createMapInstance } = require("./core/create-map-instance");
 const { loadJsonFile, applyMapProfile, loadMapWithProfile } = require("./core/map-profile-loader");
@@ -14,6 +14,11 @@ const {
   applyTerrainMaskToMap
 } = require("./core/terrain-mask-loader");
 const {
+  loadDungeonMaskPalette,
+  buildDungeonEntriesFromMaskBitmap,
+  buildDungeonEntriesFromMaskPath
+} = require("./core/dungeon-mask-loader");
+const {
   listTerrainStampPresets,
   findTerrainStampPreset,
   buildTerrainStampZone,
@@ -22,7 +27,17 @@ const {
   loadProfileFile
 } = require("./core/terrain-stamping");
 const { coordinateKey, isWithinBounds, getNeighborCoordinates, getDistance } = require("./coordinates/grid");
-const { buildTerrainIndex, buildBlockedTileSet, buildSightBlockingSet, getTileProperties } = require("./logic/terrain");
+const { buildTerrainIndex, buildBlockedTileSet, buildSightBlockingSet, buildHazardTileList, getTileProperties } = require("./logic/terrain");
+const { getCoverBetween, getCoverBonusAc, getCoverRank } = require("./logic/cover");
+const {
+  normalizeEdgeWall,
+  buildEdgeWallKey,
+  buildEdgeWallIndex,
+  getCardinalEdgeForPoints,
+  edgeWallBlocksTraversal,
+  edgeWallBlocksLine,
+  mergeUniqueEdgeWalls
+} = require("./logic/edge-walls");
 const { firstFiniteNumber, resolveActorMovementSpeedFeet } = require("./logic/actor-movement");
 const {
   normalizeTerrainType,
@@ -51,6 +66,13 @@ const {
   matchesTargetAffinity
 } = require("./spells/spell-targeting");
 const {
+  getCombatMapSpellSupport,
+  partitionCombatMapSpells,
+  filterSupportedCombatMapSpells,
+  isAreaCombatMapSpell,
+  getSpellShapeHint
+} = require("./spells/spell-support");
+const {
   feetToTiles,
   normalizeDirection,
   resolveAreaAnchor,
@@ -58,6 +80,7 @@ const {
 } = require("./spells/spell-area");
 const {
   listActorSpells,
+  listActorCombatMapSpells,
   findSpellById,
   buildSpellPreviewOverlays,
   canSelectSpellTargetPosition,
@@ -72,10 +95,13 @@ const {
   buildPhysicalRangeOverlay,
   buildSpellRangeOverlay,
   buildSpellAreaOverlay,
-  buildSelectionOverlay
+  buildSelectionOverlay,
+  buildHazardOverlay
 } = require("./logic/overlay-builders");
 const { buildAssetLibraryManifest } = require("./procedural/asset-library");
 const { renderMapSvg } = require("./render/render-map-svg");
+const { renderMapPng } = require("./render/render-map-png");
+const { buildRenderRequest, renderMapAsync, createMapRenderQueue } = require("./render/map-render-service");
 const { buildTokenVisualProfile, applyTokenVisualProfile, buildPlayerToken, buildEnemyToken, buildTokenAssetPath } = require("./tokens/token-catalog");
 const {
   loadPlayerTokenCatalog,
@@ -112,6 +138,15 @@ const {
   createCastSpellAction,
   createSelectTokenAction
 } = require("./contracts/map-action.contract");
+const { adaptMapActionToCanonicalEvent } = require("./contracts/map-event-adapter");
+const {
+  DUNGEON_MAP_ACTION_TYPES,
+  createDungeonMapAction,
+  createDungeonMapPreviewMoveAction,
+  createDungeonMapMoveDirectionAction,
+  createDungeonMapBackAction
+} = require("./contracts/dungeon-map-action.contract");
+const { adaptDungeonMapActionToCanonicalEvent } = require("./contracts/dungeon-map-event-adapter");
 const {
   INTERACTION_MODES,
   createIdleState,
@@ -147,6 +182,8 @@ module.exports = {
   DISTANCE_METRICS,
   MOVEMENT_RULES,
   ATTACK_MODES,
+  COVER_LEVELS,
+  EDGE_WALL_SIDES,
   validateMapStateShape,
   assertValidMapState,
   createMapInstance,
@@ -160,6 +197,9 @@ module.exports = {
   buildTerrainEntriesFromMaskBitmap,
   buildTerrainEntriesFromMaskPath,
   applyTerrainMaskToMap,
+  loadDungeonMaskPalette,
+  buildDungeonEntriesFromMaskBitmap,
+  buildDungeonEntriesFromMaskPath,
   listTerrainStampPresets,
   findTerrainStampPreset,
   buildTerrainStampZone,
@@ -173,7 +213,18 @@ module.exports = {
   buildTerrainIndex,
   buildBlockedTileSet,
   buildSightBlockingSet,
+  buildHazardTileList,
   getTileProperties,
+  getCoverBetween,
+  getCoverBonusAc,
+  getCoverRank,
+  normalizeEdgeWall,
+  buildEdgeWallKey,
+  buildEdgeWallIndex,
+  getCardinalEdgeForPoints,
+  edgeWallBlocksTraversal,
+  edgeWallBlocksLine,
+  mergeUniqueEdgeWalls,
   firstFiniteNumber,
   resolveActorMovementSpeedFeet,
   normalizeTerrainType,
@@ -204,11 +255,17 @@ module.exports = {
   validateSpellSelection,
   getSpellAreaOverlaySpec,
   matchesTargetAffinity,
+  getCombatMapSpellSupport,
+  partitionCombatMapSpells,
+  filterSupportedCombatMapSpells,
+  isAreaCombatMapSpell,
+  getSpellShapeHint,
   feetToTiles,
   normalizeDirection,
   resolveAreaAnchor,
   buildSpellAreaTiles,
   listActorSpells,
+  listActorCombatMapSpells,
   findSpellById,
   buildSpellPreviewOverlays,
   canSelectSpellTargetPosition,
@@ -222,8 +279,13 @@ module.exports = {
   buildSpellRangeOverlay,
   buildSpellAreaOverlay,
   buildSelectionOverlay,
+  buildHazardOverlay,
   buildAssetLibraryManifest,
   renderMapSvg,
+  renderMapPng,
+  buildRenderRequest,
+  renderMapAsync,
+  createMapRenderQueue,
   buildTokenVisualProfile,
   applyTokenVisualProfile,
   buildPlayerToken,
@@ -257,6 +319,13 @@ module.exports = {
   createAttackTargetCoordinateAction,
   createCastSpellAction,
   createSelectTokenAction,
+  adaptMapActionToCanonicalEvent,
+  DUNGEON_MAP_ACTION_TYPES,
+  createDungeonMapAction,
+  createDungeonMapPreviewMoveAction,
+  createDungeonMapMoveDirectionAction,
+  createDungeonMapBackAction,
+  adaptDungeonMapActionToCanonicalEvent,
   INTERACTION_MODES,
   createIdleState,
   handleButtonAction,

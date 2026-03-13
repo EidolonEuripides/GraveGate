@@ -2,6 +2,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const { mergeUniqueEdgeWalls } = require("../logic/edge-walls");
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -95,6 +96,7 @@ function applyMapProfile(baseMap, profile) {
   merged.blocked_tiles = mergeUniqueByCoordinate(merged.blocked_tiles, profile.blocked_tiles);
   merged.terrain = mergeUniqueByCoordinate(merged.terrain, profile.terrain);
   merged.terrain_zones = mergeLists(merged.terrain_zones, profile.terrain_zones);
+  merged.edge_walls = mergeUniqueEdgeWalls(merged.edge_walls, profile.edge_walls, merged.grid);
 
   if (Array.isArray(profile.tokens)) {
     merged.tokens = mergeEntriesByStableKey(merged.tokens, clone(profile.tokens), "token");

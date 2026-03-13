@@ -3,8 +3,17 @@
 const { DISTANCE_METRICS } = require("../constants");
 const { coordinateKey, getDistance, isWithinBounds } = require("../coordinates/grid");
 const { buildSightBlockingSet } = require("./terrain");
+const { edgeWallBlocksLine, edgeWallBlocksTraversal } = require("./edge-walls");
 
 function hasLineOfSight(map, origin, target) {
+  if (edgeWallBlocksTraversal(map, origin, target, "sight")) {
+    return false;
+  }
+
+  if (edgeWallBlocksLine(map, origin, target, "sight")) {
+    return false;
+  }
+
   const blocking = buildSightBlockingSet(map);
   const dx = target.x - origin.x;
   const dy = target.y - origin.y;

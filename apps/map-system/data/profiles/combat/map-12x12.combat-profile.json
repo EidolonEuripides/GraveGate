@@ -12,6 +12,6 @@
     "terrain_type_counts": {
       "open": 144
     },
-    "mask_path": "apps/map-system/assets/masks/mask-12x12.png"
+    "mask_path": "apps/map-system/assets/masks/combat/mask-12x12.png"
   }
 }

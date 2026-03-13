@@ -1,6 +1,26 @@
 {
   "tokens": [
     {
+      "token_choice_id": "airgen-female-001",
+      "label": "Airgen Female 001",
+      "category": "players",
+      "file_name": "airgen-female-001.png",
+      "processed_file_name": "processed/airgen-female-001.cleaned.png",
+      "shape": "circle",
+      "badge_text": "",
+      "notes": "Batch-processed player token."
+    },
+    {
+      "token_choice_id": "airgen-male-001",
+      "label": "Airgen Male 001",
+      "category": "players",
+      "file_name": "airgen-male-001.png",
+      "processed_file_name": "processed/airgen-male-001.cleaned.png",
+      "shape": "circle",
+      "badge_text": "",
+      "notes": "Batch-processed player token."
+    },
+    {
       "token_choice_id": "asamar-female-01",
       "label": "Asamar Female 01",
       "category": "players",
@@ -41,6 +61,46 @@
       "notes": "Batch-processed player token."
     },
     {
+      "token_choice_id": "earthgen-female-001",
+      "label": "Earthgen Female 001",
+      "category": "players",
+      "file_name": "earthgen-female-001.png",
+      "processed_file_name": "processed/earthgen-female-001.cleaned.png",
+      "shape": "circle",
+      "badge_text": "",
+      "notes": "Batch-processed player token."
+    },
+    {
+      "token_choice_id": "earthgen-male-001",
+      "label": "Earthgen Male 001",
+      "category": "players",
+      "file_name": "earthgen-male-001.png",
+      "processed_file_name": "processed/earthgen-male-001.cleaned.png",
+      "shape": "circle",
+      "badge_text": "",
+      "notes": "Batch-processed player token."
+    },
+    {
+      "token_choice_id": "eladrin-female-01",
+      "label": "Eladrin Female 01",
+      "category": "players",
+      "file_name": "eladrin-female-01.png",
+      "processed_file_name": "processed/eladrin-female-01.cleaned.png",
+      "shape": "circle",
+      "badge_text": "",
+      "notes": "Batch-processed player token."
+    },
+    {
+      "token_choice_id": "eladrin-male-01",
+      "label": "Eladrin Male 01",
+      "category": "players",
+      "file_name": "eladrin-male-01.png",
+      "processed_file_name": "processed/eladrin-male-01.cleaned.png",
+      "shape": "circle",
+      "badge_text": "",
+      "notes": "Batch-processed player token."
+    },
+    {
       "token_choice_id": "elf-female-01",
       "label": "Elf Female 01",
       "category": "players",
@@ -66,6 +126,36 @@
       "category": "players",
       "file_name": "female-tiefling-02.png",
       "processed_file_name": "processed/female-tiefling-02.cleaned.png",
+      "shape": "circle",
+      "badge_text": "",
+      "notes": "Batch-processed player token."
+    },
+    {
+      "token_choice_id": "fire-genasi-male-001",
+      "label": "Fire Genasi Male 001",
+      "category": "players",
+      "file_name": "fire-genasi-male-001.png",
+      "processed_file_name": "processed/fire-genasi-male-001.cleaned.png",
+      "shape": "circle",
+      "badge_text": "",
+      "notes": "Batch-processed player token."
+    },
+    {
+      "token_choice_id": "firegenasi-female-001",
+      "label": "Firegenasi Female 001",
+      "category": "players",
+      "file_name": "firegenasi-female-001.png",
+      "processed_file_name": "processed/firegenasi-female-001.cleaned.png",
+      "shape": "circle",
+      "badge_text": "",
+      "notes": "Batch-processed player token."
+    },
+    {
+      "token_choice_id": "githzerai-male-001",
+      "label": "Githzerai Male 001",
+      "category": "players",
+      "file_name": "githzerai-male-001.png",
+      "processed_file_name": "processed/githzerai-male-001.cleaned.png",
       "shape": "circle",
       "badge_text": "",
       "notes": "Batch-processed player token."
@@ -176,6 +266,26 @@
       "category": "players",
       "file_name": "tielfing-male-03.png",
       "processed_file_name": "processed/tielfing-male-03.cleaned.png",
+      "shape": "circle",
+      "badge_text": "",
+      "notes": "Batch-processed player token."
+    },
+    {
+      "token_choice_id": "watergen-female-001",
+      "label": "Watergen Female 001",
+      "category": "players",
+      "file_name": "watergen-female-001.png",
+      "processed_file_name": "processed/watergen-female-001.cleaned.png",
+      "shape": "circle",
+      "badge_text": "",
+      "notes": "Batch-processed player token."
+    },
+    {
+      "token_choice_id": "watergen-male-001",
+      "label": "Watergen Male 001",
+      "category": "players",
+      "file_name": "watergen-male-001.png",
+      "processed_file_name": "processed/watergen-male-001.cleaned.png",
       "shape": "circle",
       "badge_text": "",
       "notes": "Batch-processed player token."

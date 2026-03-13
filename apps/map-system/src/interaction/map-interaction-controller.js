@@ -23,7 +23,7 @@ const {
 } = require("../attacks/attack-interaction.service");
 const { buildTokenSelectionChoices, applyPlayerTokenChoice } = require("../tokens/token-selection.service");
 const {
-  listActorSpells,
+  listActorCombatMapSpells,
   buildSpellPreviewState,
   selectSpellTarget,
   confirmSpellSelection
@@ -149,7 +149,27 @@ function renderTokenMode(context, choices, page) {
   };
 }
 
-function renderSpellMode(context, spells, page) {
+function renderSpellMode(context, spells, unsupportedSpells, page) {
+  const unsupported = Array.isArray(unsupportedSpells) ? unsupportedSpells : [];
+  const supported = Array.isArray(spells) ? spells : [];
+  const unsupportedNames = unsupported.slice(0, 5).map((entry) => entry.name).filter(Boolean);
+  const content = supported.length > 0
+    ? null
+    : buildSpellSelectionMessagePayload({
+        actor_id: context.actor_id,
+        instance_id: context.instance_id,
+        instance_type: context.instance_type,
+        turn_label: getTurnLabel(context),
+        spells: supported,
+        page: page || 1,
+        unsupported_spells: unsupported,
+        content: [
+          "No supported map-mode combat spells are available right now.",
+          unsupportedNames.length > 0 ? `Unsupported here: ${unsupportedNames.join(", ")}` : "",
+          "Map mode currently supports 1-action combat spells with single-target, split-target, self, cone, cube, sphere, or line targeting."
+        ].filter(Boolean).join("\n")
+      }).content;
+
   return {
     ok: true,
     state: {
@@ -157,6 +177,7 @@ function renderSpellMode(context, spells, page) {
       mode: INTERACTION_MODES.SPELL_LIST,
       pending: {
         spells,
+        unsupported_spells: unsupported,
         page: page || 1
       }
     },
@@ -166,7 +187,9 @@ function renderSpellMode(context, spells, page) {
       instance_type: context.instance_type,
       turn_label: getTurnLabel(context),
       spells,
-      page: page || 1
+      unsupported_spells: unsupported,
+      page: page || 1,
+      content
     })
   };
 }
@@ -361,12 +384,12 @@ function enterTokenMode(context) {
 
 function enterSpellMode(context) {
   const actorToken = findActorToken(context.map, context.actor_id);
-  const spells = listActorSpells({
+  const spellPartition = listActorCombatMapSpells({
     actor: actorToken || {},
     spells: context.spells || []
   });
 
-  return renderSpellMode(context, spells, 1);
+  return renderSpellMode(context, spellPartition.supported, spellPartition.unsupported, 1);
 }
 
 function previewSpell(context, spellId, previewTarget) {
@@ -590,10 +613,11 @@ function handleButtonAction(context, customId) {
   if (parsed.action.startsWith(`${MAP_BUTTON_ACTIONS.SPELL_PAGE},`)) {
     const page = Number(parsed.action.split(",")[1] || 1);
     const spells = context.state && context.state.pending && context.state.pending.spells;
+    const unsupportedSpells = context.state && context.state.pending && context.state.pending.unsupported_spells;
     if (!spells) {
       return { ok: false, error: "no active spell list to page" };
     }
-    return renderSpellMode(context, spells, page);
+    return renderSpellMode(context, spells, unsupportedSpells, page);
   }
   if (parsed.action === MAP_BUTTON_ACTIONS.BACK) {
     return {

@@ -8,6 +8,10 @@ const {
   getSpellAreaOverlaySpec
 } = require("./spell-targeting");
 const {
+  getCombatMapSpellSupport,
+  partitionCombatMapSpells
+} = require("./spell-support");
+const {
   buildSpellRangeOverlay,
   buildSpellAreaOverlay,
   buildSelectionOverlay
@@ -28,11 +32,20 @@ function listActorSpells(options) {
       spell_id: String(spell.spell_id || spell.id || ""),
       name: String(spell.name || ""),
       level: Number(spell.level || 0),
+      casting_time: String(spell.casting_time || ""),
       range: String(spell.range || ""),
+      targeting: spell && spell.targeting && typeof spell.targeting === "object"
+        ? { type: String(spell.targeting.type || "") }
+        : null,
       targeting_type: String(spell.targeting && spell.targeting.type || ""),
       attack_or_save_type: String(spell.attack_or_save && spell.attack_or_save.type || "none")
     }))
     .sort((left, right) => left.level - right.level || left.name.localeCompare(right.name));
+}
+
+function listActorCombatMapSpells(options) {
+  const listed = listActorSpells(options);
+  return partitionCombatMapSpells(listed);
 }
 
 function findSpellById(spells, spellId) {
@@ -300,6 +313,14 @@ function buildSpellPreviewState(options) {
     };
   }
 
+  const support = getCombatMapSpellSupport(spell);
+  if (!support.supported) {
+    return {
+      ok: false,
+      error: support.reason
+    };
+  }
+
   const profile = buildSpellTargetingProfile(spell);
   if (
     options.target_token_ref ||
@@ -389,6 +410,22 @@ function buildSpellPreviewState(options) {
 }
 
 function selectSpellTarget(options) {
+  const spell = findSpellById(options.spells, options.spell_id);
+  if (!spell) {
+    return {
+      ok: false,
+      error: "unknown spell"
+    };
+  }
+
+  const support = getCombatMapSpellSupport(spell);
+  if (!support.supported) {
+    return {
+      ok: false,
+      error: support.reason
+    };
+  }
+
   const selected = buildValidatedSpellSelection(options);
   if (!selected.ok) {
     return selected;
@@ -409,6 +446,14 @@ function confirmSpellSelection(options) {
     return {
       ok: false,
       error: "unknown spell"
+    };
+  }
+
+  const support = getCombatMapSpellSupport(spell);
+  if (!support.supported) {
+    return {
+      ok: false,
+      error: support.reason
     };
   }
 
@@ -480,6 +525,7 @@ function confirmSpellSelection(options) {
 
 module.exports = {
   listActorSpells,
+  listActorCombatMapSpells,
   findSpellById,
   buildSpellPreviewOverlays,
   canSelectSpellTargetPosition,

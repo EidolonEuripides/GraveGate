@@ -2,6 +2,7 @@
 
 const assert = require("assert");
 const { handleGatewayInteraction, __test } = require("../index");
+const { buildDungeonMapState } = require("../dungeonMapView");
 
 async function runTest(name, fn, results) {
   try {
@@ -60,6 +61,7 @@ function createButtonInteraction(customId, playerId) {
 
   return {
     customId,
+    message: { id: "message-gateway-runtime-001" },
     user: { id: playerId || "player-gateway-runtime-001" },
     replied: false,
     deferred: false,
@@ -1635,15 +1637,32 @@ async function runGatewayRuntimeIntegrationTests() {
                         room_id: "room-hall",
                         name: "Hall of Echoes",
                         room_type: "empty",
+                        dungeon_map: {
+                          map_path: "apps/map-system/data/maps/dungeon/map-12x12.base-map.json",
+                          profile_path: "apps/map-system/data/profiles/dungeon/map-12x12.dungeon-profile.json",
+                          party_position: { x: 1, y: 1 },
+                          party_path: [
+                            { x: 0, y: 1 },
+                            { x: 1, y: 1 }
+                          ],
+                          exits: [
+                            { direction: "west", to_room_id: "room-entry", position: { x: 0, y: 1 } },
+                            { direction: "east", to_room_id: "room-door", position: { x: 2, y: 1 } }
+                          ],
+                          objects: [
+                            { object_id: "obj-door-001", object_type: "door", position: { x: 2, y: 1 } }
+                          ]
+                        },
                         exits: [
-                          { direction: "west", to_room_id: "room-entry", locked: false },
-                          { direction: "east", to_room_id: "room-door", locked: false }
+                          { direction: "west", to_room_id: "room-entry", locked: false, position: { x: 0, y: 1 } },
+                          { direction: "east", to_room_id: "room-door", locked: false, position: { x: 2, y: 1 } }
                         ],
                         visible_objects: [
                           {
                             object_id: "obj-door-001",
                             object_type: "door",
                             name: "Bronze Door",
+                            position: { x: 2, y: 1 },
                             state: { is_opened: true }
                           }
                         ]
@@ -1674,26 +1693,70 @@ async function runGatewayRuntimeIntegrationTests() {
                     from_room_id: "room-entry",
                     to_room_id: "room-hall",
                     trap_trigger: null,
-                    room: {
-                      room_id: "room-hall",
-                      name: "Hall of Echoes",
-                      room_type: "empty",
-                      description: "A stone hall lined with carved faces.",
+                      room: {
+                        room_id: "room-hall",
+                        name: "Hall of Echoes",
+                        room_type: "empty",
+                        description: "A stone hall lined with carved faces.",
+                        encounter: {
+                          encounter_id: "enc-goblin-hall-001",
+                          name: "Goblin Scout",
+                          visible_enemy_tokens: [
+                            {
+                              token_id: "dungeon-goblin-001",
+                              actor_id: "dungeon-goblin-001",
+                              label: "Goblin Scout",
+                              badge_text: "G1",
+                              position: { x: 6, y: 6 }
+                            }
+                          ]
+                        },
+                        dungeon_map: {
+                          map_path: "apps/map-system/data/maps/dungeon/map-12x12.base-map.json",
+                          profile_path: "apps/map-system/data/profiles/dungeon/map-12x12.dungeon-profile.json",
+                          party_position: { x: 1, y: 1 },
+                          party_path: [
+                            { x: 0, y: 1 },
+                            { x: 1, y: 1 }
+                          ],
+                          encounter_triggers: [
+                            { position: { x: 6, y: 6 }, label: "enc" }
+                          ],
+                          visible_enemy_tokens: [
+                            {
+                              token_id: "dungeon-goblin-001",
+                              actor_id: "dungeon-goblin-001",
+                              label: "Goblin Scout",
+                              badge_text: "G1",
+                              position: { x: 6, y: 6 }
+                            }
+                          ],
+                          exits: [
+                            { direction: "west", to_room_id: "room-entry", position: { x: 0, y: 1 } },
+                            { direction: "east", to_room_id: "room-door", position: { x: 2, y: 1 } }
+                        ],
+                        objects: [
+                          { object_id: "obj-door-001", object_type: "door", position: { x: 2, y: 1 } },
+                          { object_id: "obj-lore-001", object_type: "lore_object", position: { x: 4, y: 2 } }
+                        ]
+                      },
                       exits: [
-                        { direction: "west", to_room_id: "room-entry", locked: false },
-                        { direction: "east", to_room_id: "room-door", locked: false }
+                        { direction: "west", to_room_id: "room-entry", locked: false, position: { x: 0, y: 1 } },
+                        { direction: "east", to_room_id: "room-door", locked: false, position: { x: 2, y: 1 } }
                       ],
                       visible_objects: [
                         {
                           object_id: "obj-door-001",
                           object_type: "door",
                           name: "Bronze Door",
+                          position: { x: 2, y: 1 },
                           state: { is_locked: true }
                         },
                         {
                           object_id: "obj-lore-001",
                           object_type: "lore_object",
                           name: "Weathered Tablet",
+                          position: { x: 4, y: 2 },
                           state: {}
                         }
                       ]
@@ -1718,18 +1781,70 @@ async function runGatewayRuntimeIntegrationTests() {
     assert.equal(interaction._replyCalls.length, 1);
     const content = interaction._replyCalls[0].content;
     assert.equal(content.includes("Room: Hall of Echoes"), true);
+    assert.equal(content.includes("Visible enemies: 1"), true);
     assert.equal(content.includes("Exits: west -> room-entry | east -> room-door"), true);
     assert.equal(content.includes("Bronze Door [door; locked]"), true);
     assert.equal(content.includes("Weathered Tablet [lore_object]"), true);
+    assert.equal(Array.isArray(interaction._replyCalls[0].files), true);
+    assert.equal(interaction._replyCalls[0].files.length >= 1, true);
     assert.equal(Array.isArray(interaction._replyCalls[0].components), true);
-    assert.equal(interaction._replyCalls[0].components.length >= 2, true);
+    assert.equal(interaction._replyCalls[0].components.length >= 3, true);
     assert.equal(interaction._replyCalls[0].components[1].components[0].data.label, "Unlock Bronze Door");
+    assert.equal(
+      interaction._replyCalls[0].components.some((row) =>
+        Array.isArray(row.components) && row.components.some((button) => button.data.label === "Preview Move")
+      ),
+      true
+    );
     assert.equal(
       interaction._replyCalls[0].components.some((row) =>
         Array.isArray(row.components) && row.components.some((button) => button.data.label === "Open Bronze Door")
       ),
       true
     );
+
+    const mapPreviewButton = createButtonInteraction("dungeon-map:view:preview_move:session-room-001", "player-gateway-room-001");
+    const previewOut = await handleGatewayInteraction(mapPreviewButton, runtime);
+    assert.equal(previewOut.ok, true);
+    assert.equal(mapPreviewButton._updateCalls.length, 1);
+    assert.equal(String(mapPreviewButton._updateCalls[0].content).includes("Choose a highlighted exit"), true);
+    assert.equal(String(mapPreviewButton._updateCalls[0].content).includes("Mode: Move Preview"), true);
+    assert.equal(String(mapPreviewButton._updateCalls[0].content).includes("Visible enemies: 1"), true);
+    assert.equal(Array.isArray(mapPreviewButton._updateCalls[0].files), true);
+    assert.equal(mapPreviewButton._updateCalls[0].files.length >= 1, true);
+    assert.equal(
+      mapPreviewButton._updateCalls[0].components.some((row) =>
+        Array.isArray(row.components) && row.components.some((button) => button.data.label.includes("west") || button.data.label.includes("east"))
+      ),
+      true
+    );
+
+    const backButton = createButtonInteraction("dungeon-map:view:back:session-room-001", "player-gateway-room-001");
+    const backOut = await handleGatewayInteraction(backButton, runtime);
+    assert.equal(backOut.ok, true);
+    assert.equal(backButton._updateCalls.length, 1);
+    assert.equal(String(backButton._updateCalls[0].content).includes("Dungeon map ready."), true);
+    assert.equal(String(backButton._updateCalls[0].content).includes("Mode: Exploration"), true);
+
+    const mapMoveButton = createButtonInteraction("dungeon-map:view:move:session-room-001:east", "player-gateway-room-001");
+    const mapMoveOut = await handleGatewayInteraction(mapMoveButton, runtime);
+    assert.equal(mapMoveOut.ok, true);
+    assert.equal(receivedEvents.some((event) => event.event_type === "player_move" && event.payload && event.payload.direction === "east"), true);
+    const dispatchedMoveEvent = receivedEvents.find((event) =>
+      event.event_type === "player_move"
+      && event.payload
+      && event.payload.direction === "east"
+      && event.source === "gateway.discord.map"
+    );
+    assert.equal(Boolean(dispatchedMoveEvent), true);
+    assert.equal(dispatchedMoveEvent.target_system, "session_system");
+    assert.equal(dispatchedMoveEvent.source, "gateway.discord.map");
+    assert.equal(dispatchedMoveEvent.session_id, "session-room-001");
+    assert.equal(Boolean(dispatchedMoveEvent.payload.map_action_id), true);
+    assert.equal(mapMoveButton._updateCalls.length, 1);
+    assert.equal(String(mapMoveButton._updateCalls[0].content).includes("Room: Hall of Echoes"), true);
+    assert.equal(Array.isArray(mapMoveButton._updateCalls[0].files), true);
+    assert.equal(mapMoveButton._updateCalls[0].files.length >= 1, true);
 
     const objectButton = createButtonInteraction("dungeon:view:object:session-room-001:obj-door-001:open", "player-gateway-room-001");
     const buttonOut = await handleGatewayInteraction(objectButton, runtime);
@@ -1741,6 +1856,115 @@ async function runGatewayRuntimeIntegrationTests() {
     assert.equal(String(objectButton._updateCalls[0].content).includes("Spell Effect: Knock"), true);
     assert.equal(String(objectButton._updateCalls[0].content).includes("Check: investigation passed (15 vs DC 12)"), true);
     assert.equal(String(objectButton._updateCalls[0].content).includes("Mechanism: opened obj-door-002"), true);
+    assert.equal(Array.isArray(objectButton._updateCalls[0].files), true);
+    assert.equal(objectButton._updateCalls[0].files.length >= 1, true);
+  }, results);
+
+  await runTest("dungeon_map_state_builds_typed_object_markers_and_visible_enemy_tokens", async () => {
+    const out = await buildDungeonMapState({
+      data: {
+        session_id: "session-dungeon-map-state-001",
+        session: {
+          session_id: "session-dungeon-map-state-001",
+          leader_id: "player-dungeon-leader-001"
+        },
+        room: {
+          room_id: "room-state-001",
+          name: "Signal Chamber",
+          room_type: "encounter",
+          encounter: {
+            encounter_id: "enc-state-001",
+            name: "Skeleton Watch",
+            visible_enemy_tokens: [
+              {
+                token_id: "skeleton-watch-001",
+                actor_id: "skeleton-watch-001",
+                label: "Skeleton Watch",
+                badge_text: "S1",
+                position: { x: 8, y: 3 }
+              }
+            ]
+          },
+          exits: [
+            { direction: "east", to_room_id: "room-state-002", position: { x: 11, y: 5 } }
+          ],
+          visible_objects: [
+            {
+              object_id: "door-state-001",
+              object_type: "door",
+              name: "Iron Door",
+              position: { x: 4, y: 5 },
+              state: { is_locked: true }
+            },
+            {
+              object_id: "trap-state-001",
+              object_type: "trap",
+              name: "Floor Spikes",
+              position: { x: 6, y: 4 },
+              state: {}
+            },
+            {
+              object_id: "chest-state-001",
+              object_type: "chest",
+              name: "Signal Chest",
+              position: { x: 2, y: 2 },
+              state: { is_locked: false }
+            }
+          ],
+          dungeon_map: {
+            map_path: "apps/map-system/data/maps/dungeon/map-12x10.base-map.json",
+            profile_path: "apps/map-system/data/profiles/dungeon/map-12x10.dungeon-profile.json",
+            party_position: { x: 1, y: 5 },
+            party_path: [
+              { x: 0, y: 5 },
+              { x: 1, y: 5 }
+            ],
+            encounter_triggers: [
+              { encounter_id: "enc-state-001", position: { x: 8, y: 3 }, label: "enc" }
+            ]
+          }
+        }
+      },
+      map_config: {
+        map_path: "C:\\Users\\Broy_\\Desktop\\GraveGatebot\\GateGrave-bot-System\\apps\\map-system\\data\\maps\\dungeon\\map-12x10.base-map.json",
+        profile_path: "C:\\Users\\Broy_\\Desktop\\GraveGatebot\\GateGrave-bot-System\\apps\\map-system\\data\\profiles\\dungeon\\map-12x10.dungeon-profile.json",
+        output_dir: "C:\\Users\\Broy_\\Desktop\\GraveGatebot\\GateGrave-bot-System\\apps\\map-system\\output\\live",
+        dungeon_map: {
+          map_path: "apps/map-system/data/maps/dungeon/map-12x10.base-map.json",
+          party_position: { x: 1, y: 5 },
+          party_path: [
+            { x: 0, y: 5 },
+            { x: 1, y: 5 }
+          ],
+          encounter_triggers: [
+            { encounter_id: "enc-state-001", position: { x: 8, y: 3 }, label: "enc" }
+          ]
+        }
+      },
+      view_state: { mode: "idle" }
+    });
+
+    assert.equal(out.ok, true);
+    assert.equal(Array.isArray(out.payload.map.tokens), true);
+    assert.equal(out.payload.map.tokens.length, 2);
+    assert.equal(out.payload.map.tokens.some((token) => token.token_type === "player"), true);
+    assert.equal(out.payload.map.tokens.some((token) => token.token_type === "enemy"), true);
+    assert.equal(
+      out.payload.map.overlays.some((overlay) => overlay && overlay.overlay_id === "dungeon-party-path-overlay"),
+      true
+    );
+    assert.equal(
+      out.payload.map.overlays.some((overlay) => overlay && String(overlay.overlay_id).includes("door-state-001")),
+      true
+    );
+    assert.equal(
+      out.payload.map.overlays.some((overlay) => overlay && String(overlay.overlay_id).includes("trap-state-001")),
+      true
+    );
+    assert.equal(
+      out.payload.map.overlays.some((overlay) => overlay && String(overlay.overlay_id).includes("dungeon-visible-enemy")),
+      true
+    );
   }, results);
 
   await runTest("gateway_trade_proposal_wizard_collects_offer_and_submits_runtime_trade", async () => {
@@ -2126,8 +2350,11 @@ async function runGatewayRuntimeIntegrationTests() {
                       participants: [
                         {
                           participant_id: "hero-001",
+                          player_id: "player-gateway-combat-001",
+                          team: "heroes",
                           current_hp: 9,
                           max_hp: 12,
+                          position: { x: 1, y: 1 },
                           action_available: false,
                           bonus_action_available: true,
                           reaction_available: true,
@@ -2136,8 +2363,10 @@ async function runGatewayRuntimeIntegrationTests() {
                         },
                         {
                           participant_id: "monster-001",
+                          team: "monsters",
                           current_hp: 3,
                           max_hp: 7,
+                          position: { x: 3, y: 1 },
                           action_available: true,
                           bonus_action_available: false,
                           reaction_available: false,
@@ -2164,7 +2393,9 @@ async function runGatewayRuntimeIntegrationTests() {
     assert.equal(out.ok, true);
     assert.equal(interaction._replyCalls.length, 1);
     assert.equal(interaction._replyCalls[0].embeds[0].data.title, "Combat State");
-    assert.equal(interaction._replyCalls[0].components.length, 1);
+    assert.equal(interaction._replyCalls[0].components.length >= 2, true);
+    assert.equal(Array.isArray(interaction._replyCalls[0].files), true);
+    assert.equal(interaction._replyCalls[0].files.length >= 1, true);
     assert.equal(String(interaction._replyCalls[0].embeds[0].data.fields[0].value).includes("Resources: Action spent | Bonus up | Reaction up | Move 15"), true);
     assert.equal(String(interaction._replyCalls[0].embeds[0].data.fields[1].value).includes("monster-001 3/7 HP | Cond Poisoned"), true);
 
@@ -2174,6 +2405,388 @@ async function runGatewayRuntimeIntegrationTests() {
     assert.equal(calls, 2);
     assert.equal(button._updateCalls.length, 1);
     assert.equal(button._updateCalls[0].embeds[0].data.title, "Combat State");
+    assert.equal(Array.isArray(button._updateCalls[0].files), true);
+    assert.equal(button._updateCalls[0].files.length >= 1, true);
+  }, results);
+
+  await runTest("gateway_handles_map_ui_move_preview_without_putting_gameplay_logic_in_gateway", async () => {
+    const runtime = {
+      processGatewayReadCommandEvent(event) {
+        return {
+          ok: true,
+          event_type: "read_command_runtime_completed",
+          payload: {
+            responses: [
+              {
+                event_type: "gateway_response_ready",
+                payload: {
+                  response_type: "combat",
+                  ok: true,
+                    data: {
+                      combat_id: "combat-gateway-map-ui-001",
+                      actor_spells: [
+                        {
+                          spell_id: "fire_bolt",
+                          name: "Fire Bolt",
+                          level: 0,
+                          casting_time: "1 action",
+                          range: "120 feet",
+                          targeting: { type: "single_target" }
+                        },
+                        {
+                          spell_id: "light",
+                          name: "Light",
+                          level: 0,
+                          casting_time: "1 action",
+                          range: "touch",
+                          targeting: { type: "object" }
+                        }
+                      ],
+                      combat_summary: {
+                        combat_id: "combat-gateway-map-ui-001",
+                      status: "active",
+                      round: 1,
+                      active_participant_id: "hero-001",
+                      condition_count: 0,
+                      participants: [
+                        {
+                          participant_id: "hero-001",
+                          player_id: "player-gateway-map-ui-001",
+                          team: "heroes",
+                          current_hp: 10,
+                          max_hp: 10,
+                          position: { x: 1, y: 1 },
+                          action_available: true,
+                          bonus_action_available: true,
+                          reaction_available: true,
+                          movement_remaining: 30,
+                          conditions: []
+                        },
+                        {
+                          participant_id: "monster-001",
+                          team: "monsters",
+                          current_hp: 8,
+                          max_hp: 8,
+                          position: { x: 4, y: 1 },
+                          action_available: true,
+                          bonus_action_available: true,
+                          reaction_available: true,
+                          movement_remaining: 30,
+                          conditions: []
+                        }
+                      ]
+                    }
+                  },
+                  error: null
+                }
+              }
+            ],
+            events_processed: [event],
+            final_state: {}
+          },
+          error: null
+        };
+      }
+    };
+
+    const interaction = createButtonInteraction("map-ui:move:combat:combat-gateway-map-ui-001:hero-001", "player-gateway-map-ui-001");
+    const out = await handleGatewayInteraction(interaction, runtime);
+
+    assert.equal(out.ok, true);
+    assert.equal(interaction._updateCalls.length, 1);
+      assert.equal(String(interaction._updateCalls[0].content).includes("Move Preview"), true);
+      assert.equal(Array.isArray(interaction._updateCalls[0].files), true);
+      assert.equal(interaction._updateCalls[0].files.length >= 1, true);
+    }, results);
+
+  await runTest("gateway_handles_map_ui_spell_selection_with_supported_spell_slice", async () => {
+    const runtime = {
+      processGatewayReadCommandEvent() {
+        return {
+          ok: true,
+          event_type: "read_command_runtime_completed",
+          payload: {
+            responses: [
+              {
+                event_type: "gateway_response_ready",
+                payload: {
+                  response_type: "combat",
+                  ok: true,
+                  data: {
+                    combat_id: "combat-gateway-map-ui-spell-001",
+                    actor_spells: [
+                      {
+                        spell_id: "fire_bolt",
+                        name: "Fire Bolt",
+                        level: 0,
+                        casting_time: "1 action",
+                        range: "120 feet",
+                        targeting: { type: "single_target" }
+                      },
+                      {
+                        spell_id: "bless",
+                        name: "Bless",
+                        level: 1,
+                        casting_time: "1 action",
+                        range: "30 feet",
+                        targeting: { type: "up_to_three_allies" }
+                      }
+                    ],
+                    combat_summary: {
+                      combat_id: "combat-gateway-map-ui-spell-001",
+                      status: "active",
+                      round: 1,
+                      active_participant_id: "hero-001",
+                      condition_count: 0,
+                      participants: [
+                        {
+                          participant_id: "hero-001",
+                          player_id: "player-gateway-map-ui-spell-001",
+                          known_spell_ids: ["fire_bolt", "bless"],
+                          team: "heroes",
+                          current_hp: 10,
+                          max_hp: 10,
+                          position: { x: 1, y: 1 },
+                          action_available: true,
+                          bonus_action_available: true,
+                          reaction_available: true,
+                          movement_remaining: 30,
+                          conditions: []
+                        },
+                        {
+                          participant_id: "monster-001",
+                          team: "monsters",
+                          current_hp: 8,
+                          max_hp: 8,
+                          position: { x: 4, y: 1 },
+                          action_available: true,
+                          bonus_action_available: true,
+                          reaction_available: true,
+                          movement_remaining: 30,
+                          conditions: []
+                        }
+                      ]
+                    }
+                  },
+                  error: null
+                }
+              }
+            ],
+            events_processed: [],
+            final_state: {}
+          },
+          error: null
+        };
+      }
+    };
+
+    const listInteraction = createButtonInteraction("map-ui:spell:combat:combat-gateway-map-ui-spell-001:hero-001", "player-gateway-map-ui-spell-001");
+    const listOut = await handleGatewayInteraction(listInteraction, runtime);
+    assert.equal(listOut.ok, true);
+    assert.equal(String(listInteraction._updateCalls[0].content).includes("Choose a spell"), true);
+    assert.equal(String(listInteraction._updateCalls[0].content).includes("Bless"), true);
+    assert.equal(
+      listInteraction._updateCalls[0].components.some((row) =>
+        Array.isArray(row.components) && row.components.some((button) => String(button.data.label) === "Fire Bolt")
+      ),
+      true
+    );
+    assert.equal(
+      listInteraction._updateCalls[0].components.some((row) =>
+        Array.isArray(row.components) && row.components.some((button) => String(button.data.label) === "Bless")
+      ),
+      false
+    );
+
+    const previewInteraction = createButtonInteraction("map-ui:spell,fire_bolt:combat:combat-gateway-map-ui-spell-001:hero-001", "player-gateway-map-ui-spell-001");
+    const previewOut = await handleGatewayInteraction(previewInteraction, runtime);
+    assert.equal(previewOut.ok, true);
+    assert.equal(String(previewInteraction._updateCalls[0].content).includes("Spell Preview"), true);
+    assert.equal(String(previewInteraction._updateCalls[0].content).includes("Fire Bolt"), true);
+    assert.equal(Array.isArray(previewInteraction._updateCalls[0].files), true);
+    assert.equal(previewInteraction._updateCalls[0].files.length >= 1, true);
+  }, results);
+
+  await runTest("gateway_combat_map_dry_run_flow_supports_open_move_attack_and_spell_preview_without_discord", async () => {
+    const receivedEvents = [];
+
+    function buildCombatPayload() {
+      return {
+        combat_id: "combat-gateway-live-flow-001",
+        actor_spells: [
+          {
+            spell_id: "fire_bolt",
+            name: "Fire Bolt",
+            level: 0,
+            casting_time: "1 action",
+            range: "120 feet",
+            targeting: { type: "single_target" }
+          },
+          {
+            spell_id: "thunderwave",
+            name: "Thunderwave",
+            level: 1,
+            casting_time: "1 action",
+            range: "self",
+            targeting: { type: "cube_15" }
+          },
+          {
+            spell_id: "bless",
+            name: "Bless",
+            level: 1,
+            casting_time: "1 action",
+            range: "30 feet",
+            targeting: { type: "up_to_three_allies" }
+          }
+        ],
+        combat_summary: {
+          combat_id: "combat-gateway-live-flow-001",
+          status: "active",
+          round: 2,
+          active_participant_id: "hero-001",
+          condition_count: 0,
+          participants: [
+            {
+              participant_id: "hero-001",
+              player_id: "player-gateway-live-flow-001",
+              known_spell_ids: ["fire_bolt", "thunderwave", "bless"],
+              team: "heroes",
+              current_hp: 14,
+              max_hp: 14,
+              position: { x: 1, y: 1 },
+              action_available: true,
+              bonus_action_available: true,
+              reaction_available: true,
+              movement_remaining: 30,
+              conditions: [],
+              weapon_profile: {
+                weapon_name: "Longsword",
+                mode: "melee",
+                range_feet: 5
+              }
+            },
+            {
+              participant_id: "monster-001",
+              team: "monsters",
+              current_hp: 12,
+              max_hp: 12,
+              position: { x: 2, y: 1 },
+              action_available: true,
+              bonus_action_available: true,
+              reaction_available: true,
+              movement_remaining: 30,
+              conditions: []
+            }
+          ]
+        }
+      };
+    }
+
+    const runtime = {
+      processGatewayReadCommandEvent(event) {
+        receivedEvents.push(event);
+
+        return {
+          ok: true,
+          event_type: "read_command_runtime_completed",
+          payload: {
+            responses: [
+              {
+                event_type: "gateway_response_ready",
+                payload: {
+                  response_type: "combat",
+                  ok: true,
+                  data: buildCombatPayload(),
+                  error: null
+                }
+              }
+            ],
+            events_processed: [event],
+            final_state: {}
+          },
+          error: null
+        };
+      }
+    };
+
+    const combatInteraction = createInteraction("combat", [], "player-gateway-live-flow-001");
+    const combatOut = await handleGatewayInteraction(combatInteraction, runtime);
+    assert.equal(combatOut.ok, true);
+    assert.equal(combatInteraction._replyCalls.length, 1);
+    assert.equal(combatInteraction._replyCalls[0].embeds[0].data.title, "Combat State");
+    assert.equal(Array.isArray(combatInteraction._replyCalls[0].files), true);
+    assert.equal(combatInteraction._replyCalls[0].files.length >= 1, true);
+    assert.equal(
+      combatInteraction._replyCalls[0].components.some((row) =>
+        Array.isArray(row.components) && row.components.some((button) => String(button.data.label) === "Move")
+      ),
+      true
+    );
+
+    const moveInteraction = createButtonInteraction("map-ui:move:combat:combat-gateway-live-flow-001:hero-001", "player-gateway-live-flow-001");
+    const moveOut = await handleGatewayInteraction(moveInteraction, runtime);
+    assert.equal(moveOut.ok, true);
+    assert.equal(moveInteraction._updateCalls.length, 1);
+    assert.equal(String(moveInteraction._updateCalls[0].content).includes("Move Preview"), true);
+    assert.equal(Array.isArray(moveInteraction._updateCalls[0].files), true);
+    assert.equal(moveInteraction._updateCalls[0].files.length >= 1, true);
+
+    const attackInteraction = createButtonInteraction("map-ui:attack:combat:combat-gateway-live-flow-001:hero-001", "player-gateway-live-flow-001");
+    const attackOut = await handleGatewayInteraction(attackInteraction, runtime);
+    assert.equal(attackOut.ok, true);
+    assert.equal(String(attackInteraction._updateCalls[0].content).includes("Attack Preview"), true);
+    assert.equal(
+      attackInteraction._updateCalls[0].components.some((row) =>
+        Array.isArray(row.components) && row.components.some((button) => String(button.data.label) === "monster-001")
+      ),
+      true
+    );
+
+    const attackTargetInteraction = createButtonInteraction("map-ui:attack_target,monster-001:combat:combat-gateway-live-flow-001:hero-001", "player-gateway-live-flow-001");
+    const attackTargetOut = await handleGatewayInteraction(attackTargetInteraction, runtime);
+    assert.equal(attackTargetOut.ok, true);
+    assert.equal(String(attackTargetInteraction._updateCalls[0].content).includes("Attack Preview"), true);
+    assert.equal(String(attackTargetInteraction._updateCalls[0].content).includes("monster-001"), true);
+
+    const attackConfirmInteraction = createButtonInteraction("map-ui:attack_confirm:combat:combat-gateway-live-flow-001:hero-001", "player-gateway-live-flow-001");
+    const attackConfirmOut = await handleGatewayInteraction(attackConfirmInteraction, runtime);
+    assert.equal(attackConfirmOut.ok, true);
+    assert.equal(attackConfirmInteraction._updateCalls.length, 1);
+    assert.equal(attackConfirmInteraction._updateCalls[0].embeds[0].data.title, "Combat State");
+    assert.equal(Array.isArray(attackConfirmInteraction._updateCalls[0].files), true);
+    assert.equal(attackConfirmInteraction._updateCalls[0].files.length >= 1, true);
+    assert.equal(receivedEvents.some((event) => event && event.event_type === "player_attack"), true);
+
+    const spellListInteraction = createButtonInteraction("map-ui:spell:combat:combat-gateway-live-flow-001:hero-001", "player-gateway-live-flow-001");
+    const spellListOut = await handleGatewayInteraction(spellListInteraction, runtime);
+    assert.equal(spellListOut.ok, true);
+    assert.equal(String(spellListInteraction._updateCalls[0].content).includes("Choose a spell"), true);
+    assert.equal(
+      spellListInteraction._updateCalls[0].components.some((row) =>
+        Array.isArray(row.components) && row.components.some((button) => String(button.data.label) === "Fire Bolt")
+      ),
+      true
+    );
+    assert.equal(
+      spellListInteraction._updateCalls[0].components.some((row) =>
+        Array.isArray(row.components) && row.components.some((button) => String(button.data.label) === "Bless")
+      ),
+      false
+    );
+    assert.equal(
+      spellListInteraction._updateCalls[0].components.some((row) =>
+        Array.isArray(row.components) && row.components.some((button) => String(button.data.label) === "Thunderwave")
+      ),
+      false
+    );
+
+    const spellPreviewInteraction = createButtonInteraction("map-ui:spell,fire_bolt:combat:combat-gateway-live-flow-001:hero-001", "player-gateway-live-flow-001");
+    const spellPreviewOut = await handleGatewayInteraction(spellPreviewInteraction, runtime);
+    assert.equal(spellPreviewOut.ok, true);
+    assert.equal(String(spellPreviewInteraction._updateCalls[0].content).includes("Spell Preview"), true);
+    assert.equal(String(spellPreviewInteraction._updateCalls[0].content).includes("Fire Bolt"), true);
+    assert.equal(Array.isArray(spellPreviewInteraction._updateCalls[0].files), true);
+    assert.equal(spellPreviewInteraction._updateCalls[0].files.length >= 1, true);
   }, results);
 
   await runTest("gateway_uses_runtime_failure_response_shape_for_replies", async () => {

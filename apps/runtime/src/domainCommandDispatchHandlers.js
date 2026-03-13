@@ -267,6 +267,12 @@ function summarizeRoomObject(entry) {
     object_type: safe.object_type || safe.type || null,
     name: safe.name || null,
     hidden: false,
+    position:
+      safe.position && typeof safe.position === "object"
+        ? clone(safe.position)
+        : (metadata.position && typeof metadata.position === "object"
+          ? clone(metadata.position)
+          : (metadata.map_position && typeof metadata.map_position === "object" ? clone(metadata.map_position) : null)),
     state: {
       is_locked: safe.is_locked === true || metadata.locked === true,
       is_opened: safe.is_opened === true,
@@ -274,6 +280,33 @@ function summarizeRoomObject(entry) {
       is_lit: safe.is_lit === true,
       is_activated: safe.is_activated === true
     }
+  };
+}
+
+function summarizeDungeonMapState(session, room) {
+  const safeRoom = room && typeof room === "object" ? room : null;
+  const safeSession = session && typeof session === "object" ? session : {};
+  if (!safeRoom) {
+    return null;
+  }
+
+  const roomMetadata = safeRoom.metadata && typeof safeRoom.metadata === "object" ? safeRoom.metadata : {};
+  const sessionMetadata = safeSession.metadata && typeof safeSession.metadata === "object" ? safeSession.metadata : {};
+  const base = safeRoom.dungeon_map && typeof safeRoom.dungeon_map === "object"
+    ? safeRoom.dungeon_map
+    : (roomMetadata.dungeon_map && typeof roomMetadata.dungeon_map === "object"
+      ? roomMetadata.dungeon_map
+      : (safeSession.dungeon_map && typeof safeSession.dungeon_map === "object"
+        ? safeSession.dungeon_map
+        : (sessionMetadata.dungeon_map && typeof sessionMetadata.dungeon_map === "object" ? sessionMetadata.dungeon_map : null)));
+
+  if (!base) {
+    return null;
+  }
+
+  return {
+    ...clone(base),
+    leader_id: base.leader_id || (safeSession.party && safeSession.party.leader_id ? safeSession.party.leader_id : safeSession.leader_id || null)
   };
 }
 
@@ -296,11 +329,20 @@ function summarizeRoomState(session) {
     exits: exits.map((entry) => ({
       direction: entry && entry.direction ? String(entry.direction) : null,
       to_room_id: entry && entry.to_room_id ? String(entry.to_room_id) : null,
-      locked: entry && entry.locked === true
+      locked: entry && entry.locked === true,
+      position:
+        entry && entry.position && typeof entry.position === "object"
+          ? clone(entry.position)
+          : (entry && entry.map_position && typeof entry.map_position === "object"
+            ? clone(entry.map_position)
+            : (entry && entry.metadata && typeof entry.metadata === "object" && entry.metadata.position && typeof entry.metadata.position === "object"
+              ? clone(entry.metadata.position)
+              : null))
     })),
     visible_objects: objects
       .map((entry) => summarizeRoomObject(entry))
-      .filter(Boolean)
+      .filter(Boolean),
+    dungeon_map: summarizeDungeonMapState(session, room)
   };
 }
 
@@ -663,6 +705,13 @@ function summarizeCombatStateForGateway(combat, activeParticipantId) {
     condition_count: conditions.length,
     participants: participants.slice(0, 8).map((entry) => ({
       participant_id: entry && entry.participant_id ? String(entry.participant_id) : null,
+      player_id: entry && entry.player_id ? String(entry.player_id) : null,
+      known_spell_ids:
+        entry &&
+        entry.spellbook &&
+        Array.isArray(entry.spellbook.known_spell_ids)
+          ? clone(entry.spellbook.known_spell_ids)
+          : [],
       team: entry && entry.team ? String(entry.team) : null,
       current_hp: Number.isFinite(Number(entry && entry.current_hp)) ? Number(entry.current_hp) : null,
       max_hp: Number.isFinite(Number(entry && entry.max_hp)) ? Number(entry.max_hp) : null,
@@ -680,6 +729,42 @@ function summarizeCombatStateForGateway(combat, activeParticipantId) {
         .map((condition) => String(condition && condition.condition_type || condition && condition.condition_id || "condition"))
     }))
   };
+}
+
+function findCombatParticipantForPlayer(combat, playerId) {
+  const participants = Array.isArray(combat && combat.participants) ? combat.participants : [];
+  const safePlayerId = String(playerId || "");
+  return participants.find((entry) => (
+    String(entry && entry.player_id || "") === safePlayerId ||
+    String(entry && entry.participant_id || "") === safePlayerId
+  )) || null;
+}
+
+function summarizeCombatSpellsForGateway(context, combat, playerId) {
+  const participant = findCombatParticipantForPlayer(combat, playerId);
+  const spellbook = participant && participant.spellbook && typeof participant.spellbook === "object"
+    ? participant.spellbook
+    : {};
+  const participantKnownSpellIds = Array.isArray(spellbook.known_spell_ids)
+    ? spellbook.known_spell_ids.map((entry) => String(entry || "").trim()).filter(Boolean)
+    : [];
+  const character = resolvePlayerCharacter(context, playerId);
+  const characterSpellbook = character && character.spellbook && typeof character.spellbook === "object"
+    ? character.spellbook
+    : {};
+  const characterKnownSpellIds = Array.isArray(characterSpellbook.known_spell_ids)
+    ? characterSpellbook.known_spell_ids.map((entry) => String(entry || "").trim()).filter(Boolean)
+    : [];
+  const knownSpellIds = Array.from(new Set(
+    participantKnownSpellIds.length > 0
+      ? participantKnownSpellIds
+      : characterKnownSpellIds
+  ));
+
+  return knownSpellIds
+    .map((spellId) => resolveSpellDefinitionFromContent(context, spellId))
+    .filter(Boolean)
+    .map((spell) => clone(spell));
 }
 
 function resolveActiveSessionForPlayer(context, playerId) {
@@ -1400,8 +1485,10 @@ function handleCombatCommandDispatch(event, context) {
       combat && Array.isArray(combat.initiative_order) && Number.isFinite(Number(combat.turn_index))
         ? combat.initiative_order[combat.turn_index] || null
         : null;
+    const actorSpells = summarizeCombatSpellsForGateway(context, combat, requestEvent.player_id);
     return [createGatewayResponseEvent(requestEvent, "combat", {
       combat_summary: summarizeCombatStateForGateway(combat, activeParticipantId),
+      actor_spells: actorSpells,
       combat_id: resolved.payload && resolved.payload.combat_id ? resolved.payload.combat_id : null
     }, true, null, "combat_system")];
   }
@@ -1424,6 +1511,7 @@ function handleCombatCommandDispatch(event, context) {
 
     const attack = out.payload.attack || {};
     const progress = summarizeCombatProgression(out.payload);
+    const actorSpells = summarizeCombatSpellsForGateway(context, progress.combat, requestEvent.player_id);
     return [createGatewayResponseEvent(requestEvent, "attack", {
       attack_status: "resolved",
       combat_id: attack.combat_id || requestEvent.combat_id,
@@ -1437,6 +1525,7 @@ function handleCombatCommandDispatch(event, context) {
       combat_completed: progress.combat_completed,
       winner_team: progress.winner_team,
       combat_summary: summarizeCombatStateForGateway(progress.combat, progress.active_participant_id),
+      actor_spells: actorSpells,
       ai_turn_count: progress.ai_turn_count,
       ai_turns: clone(progress.ai_turns)
     }, true, null, "combat_system")];
@@ -1460,6 +1549,7 @@ function handleCombatCommandDispatch(event, context) {
 
     const castSpell = out.payload.cast_spell || {};
     const progress = summarizeCombatProgression(out.payload);
+    const actorSpells = summarizeCombatSpellsForGateway(context, progress.combat, requestEvent.player_id);
     return [createGatewayResponseEvent(requestEvent, "cast", {
       cast_status: "resolved",
       combat_id: castSpell.combat_id || requestEvent.combat_id,
@@ -1483,6 +1573,7 @@ function handleCombatCommandDispatch(event, context) {
       combat_completed: progress.combat_completed,
       winner_team: progress.winner_team,
       combat_summary: summarizeCombatStateForGateway(progress.combat, progress.active_participant_id),
+      actor_spells: actorSpells,
       ai_turn_count: progress.ai_turn_count,
       ai_turns: clone(progress.ai_turns)
     }, true, null, "combat_system")];
@@ -1508,6 +1599,7 @@ function handleCombatCommandDispatch(event, context) {
     const reactions = out.payload.reactions && typeof out.payload.reactions === "object" ? out.payload.reactions : {};
     const opportunityAttacks = Array.isArray(reactions.opportunity_attacks) ? reactions.opportunity_attacks : [];
     const progress = summarizeCombatProgression(out.payload);
+    const actorSpells = summarizeCombatSpellsForGateway(context, progress.combat, requestEvent.player_id);
     return [createGatewayResponseEvent(requestEvent, "move", {
       move_status: "resolved",
       combat_id: move.combat_id || requestEvent.combat_id,
@@ -1519,6 +1611,7 @@ function handleCombatCommandDispatch(event, context) {
       combat_completed: progress.combat_completed,
       winner_team: progress.winner_team,
       combat_summary: summarizeCombatStateForGateway(progress.combat, progress.active_participant_id),
+      actor_spells: actorSpells,
       ai_turn_count: progress.ai_turn_count,
       ai_turns: clone(progress.ai_turns)
     }, true, null, "combat_system")];
@@ -1542,6 +1635,7 @@ function handleCombatCommandDispatch(event, context) {
 
     const useItem = out.payload.use_item || {};
     const progress = summarizeCombatProgression(out.payload);
+    const actorSpells = summarizeCombatSpellsForGateway(context, progress.combat, requestEvent.player_id);
     return [createGatewayResponseEvent(requestEvent, "use", {
       use_status: "resolved",
       combat_id: useItem.combat_id || requestEvent.combat_id,
@@ -1554,6 +1648,7 @@ function handleCombatCommandDispatch(event, context) {
       combat_completed: progress.combat_completed,
       winner_team: progress.winner_team,
       combat_summary: summarizeCombatStateForGateway(progress.combat, progress.active_participant_id),
+      actor_spells: actorSpells,
       ai_turn_count: progress.ai_turn_count,
       ai_turns: clone(progress.ai_turns)
     }, true, null, "combat_system")];

@@ -1,0 +1,35 @@
+{
+  "map_id": "dungeon-map-26x24",
+  "map_type": "dungeon",
+  "name": "Map 26x24 Dungeon Base Map",
+  "instance_id": "dungeon-map-instance-26x24",
+  "instance_binding": {
+    "instance_type": "dungeon",
+    "instance_id": "dungeon-26x24"
+  },
+  "grid": {
+    "width": 26,
+    "height": 24,
+    "tile_size": 70
+  },
+  "asset": {
+    "base_image_path": "apps/map-system/assets/base-maps/dungeon/map_26x24.png",
+    "dungeon_mask_path": "apps/map-system/assets/masks/dungeon/mask_26x24.png",
+    "dungeon_mask_palette_id": "mspaint_dungeon_markers",
+    "has_embedded_grid": true,
+    "render_width_px": 1820,
+    "render_height_px": 1680,
+    "grid_origin_x": 0,
+    "grid_origin_y": 0,
+    "grid_width_px": 1820,
+    "grid_height_px": 1680
+  },
+  "rules": {
+    "diagonal_rule": "alternating"
+  },
+  "blocked_tiles": [],
+  "terrain": [],
+  "terrain_zones": [],
+  "tokens": [],
+  "overlays": []
+}

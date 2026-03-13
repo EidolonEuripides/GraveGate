@@ -3,6 +3,7 @@
 const { coordinateKey, isWithinBounds } = require("../coordinates/grid");
 const { expandTerrainZones } = require("./zones");
 const { normalizeTerrainType, resolveTerrainDefinition } = require("./terrain-catalog");
+const { buildEdgeWallIndex } = require("./edge-walls");
 
 function resolveTerrainFlags(entry) {
   const definition = resolveTerrainDefinition(entry);
@@ -23,7 +24,22 @@ function resolveTerrainFlags(entry) {
       : defaultBlocksMovement,
     blocks_sight: entry && entry.blocks_sight !== undefined
       ? entry.blocks_sight === true
-      : defaultBlocksSight
+      : defaultBlocksSight,
+    cover_level: entry && typeof entry.cover_level === "string"
+      ? entry.cover_level
+      : (definition && definition.cover_level) || "",
+    is_hazard: entry && entry.is_hazard !== undefined
+      ? entry.is_hazard === true
+      : Boolean(definition && definition.is_hazard),
+    hazard_kind: entry && entry.hazard_kind
+      ? String(entry.hazard_kind)
+      : (definition && definition.hazard_kind) || "",
+    damages_on_enter: entry && entry.damages_on_enter !== undefined
+      ? entry.damages_on_enter === true
+      : Boolean(definition && definition.damages_on_enter),
+    damages_on_turn_start: entry && entry.damages_on_turn_start !== undefined
+      ? entry.damages_on_turn_start === true
+      : Boolean(definition && definition.damages_on_turn_start)
   };
 }
 
@@ -66,6 +82,20 @@ function buildSightBlockingSet(map) {
   return blocked;
 }
 
+function buildSightBlockingEdgeSet(map) {
+  return buildEdgeWallIndex(map);
+}
+
+function buildHazardTileList(map) {
+  return [].concat(map.terrain || [], expandTerrainZones(map))
+    .map((entry) => ({
+      x: entry.x,
+      y: entry.y,
+      ...resolveTerrainFlags(entry)
+    }))
+    .filter((entry) => entry.is_hazard === true);
+}
+
 function getTileProperties(map, point) {
   if (!isWithinBounds(map.grid, point)) {
     return {
@@ -85,7 +115,12 @@ function getTileProperties(map, point) {
     terrain_type: flags.terrain_type,
     movement_cost: flags.movement_cost,
     blocks_movement: flags.blocks_movement,
-    blocks_sight: flags.blocks_sight
+    blocks_sight: flags.blocks_sight,
+    cover_level: flags.cover_level,
+    is_hazard: flags.is_hazard,
+    hazard_kind: flags.hazard_kind,
+    damages_on_enter: flags.damages_on_enter,
+    damages_on_turn_start: flags.damages_on_turn_start
   };
 }
 
@@ -93,6 +128,8 @@ module.exports = {
   buildTerrainIndex,
   buildBlockedTileSet,
   buildSightBlockingSet,
+  buildSightBlockingEdgeSet,
+  buildHazardTileList,
   getTileProperties,
   resolveTerrainFlags
 };

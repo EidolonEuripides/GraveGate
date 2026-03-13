@@ -2744,6 +2744,8 @@ async function runReadCommandRuntimeTests() {
     assert.equal(response.payload.data.damage_type, "fire");
     assert.equal(response.payload.data.combat_summary.combat_id, combatId);
     assert.equal(Array.isArray(response.payload.data.combat_summary.participants), true);
+    assert.equal(Array.isArray(response.payload.data.actor_spells), true);
+    assert.equal(response.payload.data.actor_spells[0].spell_id, "fire_bolt");
 
     const snapshots = combatPersistence.listCombatSnapshots();
     assert.equal(snapshots.ok, true);
@@ -2794,6 +2796,8 @@ async function runReadCommandRuntimeTests() {
     assert.equal(response.payload.data.combat_id, combatId);
     assert.equal(response.payload.data.combat_summary.combat_id, combatId);
     assert.equal(Array.isArray(response.payload.data.combat_summary.participants), true);
+    assert.equal(Array.isArray(response.payload.data.actor_spells), true);
+    assert.equal(response.payload.data.actor_spells.length, 0);
   }, results);
 
   await runTest("duplicate_replay_cast_request_is_rejected_cleanly", async () => {

@@ -3,6 +3,7 @@
 const { coordinateKey, getNeighborCoordinates, isWithinBounds } = require("../coordinates/grid");
 const { MOVEMENT_RULES } = require("../constants");
 const { buildBlockedTileSet, getTileProperties } = require("./terrain");
+const { edgeWallBlocksTraversal } = require("./edge-walls");
 
 function buildOccupiedTileSet(map, options) {
   const occupied = new Set();
@@ -58,12 +59,16 @@ function isTilePassable(map, point, blocked) {
 
 function canTraverseDiagonal(map, fromPoint, toPoint, blocked) {
   if (!isDiagonalMove(fromPoint, toPoint)) {
-    return true;
+    return !edgeWallBlocksTraversal(map, fromPoint, toPoint, "movement");
   }
 
   const sideA = { x: toPoint.x, y: fromPoint.y };
   const sideB = { x: fromPoint.x, y: toPoint.y };
-  return isTilePassable(map, sideA, blocked) && isTilePassable(map, sideB, blocked);
+  return (
+    isTilePassable(map, sideA, blocked) &&
+    isTilePassable(map, sideB, blocked) &&
+    edgeWallBlocksTraversal(map, fromPoint, toPoint, "movement") === false
+  );
 }
 
 function getReachableTiles(options) {

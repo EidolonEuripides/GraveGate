@@ -1,5 +1,6 @@
 ﻿"use strict";
 
+const fs = require("fs");
 const path = require("path");
 const dotenv = require("dotenv");
 const {
@@ -15,6 +16,22 @@ const { createDiscordClient } = require("./discord/createClient");
 const { registerCommands } = require("./discord/registerCommands");
 const { mapSlashCommandToGatewayEvent } = require("./discord/commandEventMapper");
 const { createReadCommandRuntime } = require("../../runtime/src/readCommandRuntime");
+const {
+  buildCombatMapView,
+  buildMapInteractionContext,
+  buildTokenVisualOverrides,
+  handleButtonAction: handleCombatMapButtonAction,
+  adaptMapActionToCanonicalEvent
+} = require("./combatMapView");
+const {
+  createDungeonMapMoveDirectionAction,
+  adaptDungeonMapActionToCanonicalEvent
+} = require("../../map-system/src");
+const {
+  buildDungeonMapView,
+  parseDungeonMapCustomId,
+  DUNGEON_MAP_ACTIONS
+} = require("./dungeonMapView");
 const { listAvailableRaces, getRaceOptions } = require("../../world-system/src/character/rules/raceRules");
 const { listAvailableClasses, getClassOptions, getClassData } = require("../../world-system/src/character/rules/classRules");
 
@@ -31,6 +48,8 @@ const SHOP_VIEW_TTL_MS = 15 * 60 * 1000;
 const CRAFT_VIEW_TTL_MS = 15 * 60 * 1000;
 const TRADE_VIEW_TTL_MS = 15 * 60 * 1000;
 const TRADE_PROPOSAL_VIEW_TTL_MS = 15 * 60 * 1000;
+const COMBAT_MAP_VIEW_TTL_MS = 15 * 60 * 1000;
+const DUNGEON_MAP_VIEW_TTL_MS = 15 * 60 * 1000;
 const DUNGEON_OBJECT_BUTTON_LIMIT = 5;
 const POINT_BUY_COST_BY_SCORE = Object.freeze({ 8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9 });
 const CUSTOM_IDS = {
@@ -83,6 +102,8 @@ const shopViews = new Map();
 const craftViews = new Map();
 const tradeViews = new Map();
 const tradeProposalViews = new Map();
+const combatMapViews = new Map();
+const dungeonMapViews = new Map();
 let raceCatalogCache = null;
 let classCatalogCache = null;
 
@@ -93,6 +114,10 @@ function nowMs() {
 function cleanText(value, fallback) {
   const safe = String(value || "").trim();
   return safe === "" ? fallback || "Unknown" : safe;
+}
+
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
 }
 
 function humanizeIdentifier(value, fallback) {
@@ -178,6 +203,62 @@ function pruneTradeProposalViews() {
       tradeProposalViews.delete(userId);
     }
   }
+}
+
+function buildCombatMapViewKey(userId, combatId) {
+  return `${String(userId || "").trim()}:${String(combatId || "").trim()}`;
+}
+
+function buildDungeonMapViewKey(userId, sessionId) {
+  return `${String(userId || "").trim()}:${String(sessionId || "").trim()}`;
+}
+
+function pruneCombatMapViews() {
+  const cutoff = nowMs() - COMBAT_MAP_VIEW_TTL_MS;
+  for (const [key, view] of combatMapViews.entries()) {
+    if (!view || view.expiresAt < cutoff) {
+      combatMapViews.delete(key);
+    }
+  }
+}
+
+function getCombatMapView(userId, combatId) {
+  pruneCombatMapViews();
+  return combatMapViews.get(buildCombatMapViewKey(userId, combatId)) || null;
+}
+
+function setCombatMapView(userId, combatId, view) {
+  const key = buildCombatMapViewKey(userId, combatId);
+  if (!key || key === ":") {
+    return;
+  }
+  combatMapViews.set(key, Object.assign({}, view, {
+    expiresAt: nowMs() + COMBAT_MAP_VIEW_TTL_MS
+  }));
+}
+
+function pruneDungeonMapViews() {
+  const cutoff = nowMs() - DUNGEON_MAP_VIEW_TTL_MS;
+  for (const [key, view] of dungeonMapViews.entries()) {
+    if (!view || view.expiresAt < cutoff) {
+      dungeonMapViews.delete(key);
+    }
+  }
+}
+
+function getDungeonMapView(userId, sessionId) {
+  pruneDungeonMapViews();
+  return dungeonMapViews.get(buildDungeonMapViewKey(userId, sessionId)) || null;
+}
+
+function setDungeonMapView(userId, sessionId, view) {
+  const key = buildDungeonMapViewKey(userId, sessionId);
+  if (!key || key === ":") {
+    return;
+  }
+  dungeonMapViews.set(key, Object.assign({}, view, {
+    expiresAt: nowMs() + DUNGEON_MAP_VIEW_TTL_MS
+  }));
 }
 
 function getStartSession(userId) {
@@ -2768,6 +2849,97 @@ function formatGatewayReplyFromRuntime(runtimeResult) {
   };
 }
 
+function hasCombatSummary(data) {
+  return Boolean(data && data.combat_summary && typeof data.combat_summary === "object");
+}
+
+function hasDungeonRoomSnapshot(data) {
+  return Boolean(data && data.room && typeof data.room === "object");
+}
+
+function buildCombatReadEvent(userId, combatId) {
+  return createEvent(EVENT_TYPES.PLAYER_COMBAT_REQUESTED, {
+    command_name: "combat",
+    combat_id: combatId
+  }, {
+    source: "gateway.discord",
+    target_system: "combat_system",
+    player_id: userId,
+    combat_id: combatId
+  });
+}
+
+async function attachCombatMapToReply(reply, userId, storedView, options) {
+  if (!reply || !reply.ok || !hasCombatSummary(reply.data)) {
+    return reply;
+  }
+
+  const mapView = await buildCombatMapView({
+    data: reply.data,
+    user_id: userId,
+    token_overrides: storedView && Array.isArray(storedView.token_overrides) ? storedView.token_overrides : [],
+    interaction_state: storedView && storedView.interaction_state ? storedView.interaction_state : null,
+    content: options && options.map_content ? options.map_content : "",
+    component_rows: options && Array.isArray(options.component_rows) ? options.component_rows : null,
+    map_override: options && options.map_override ? options.map_override : null,
+    suffix: options && options.suffix ? options.suffix : null
+  });
+  if (!mapView.ok) {
+    return reply;
+  }
+
+  const combatId = cleanText(reply.data.combat_id, cleanText(reply.data.combat_summary && reply.data.combat_summary.combat_id, ""));
+  if (combatId) {
+    setCombatMapView(userId, combatId, {
+      combat_id: combatId,
+      map_config: mapView.payload.map_config,
+      interaction_state: mapView.payload.interaction_state,
+      token_overrides: mapView.payload.token_overrides,
+      token_catalog: mapView.payload.token_catalog
+    });
+  }
+
+  return Object.assign({}, reply, {
+    content: [reply.content, mapView.payload.content].filter(Boolean).join("\n\n"),
+    files: [].concat(Array.isArray(reply.files) ? reply.files : [], mapView.payload.files || []),
+    components: [].concat(Array.isArray(reply.components) ? reply.components : [], mapView.payload.components || [])
+  });
+}
+
+async function attachDungeonMapToReply(reply, userId, storedView, options) {
+  if (!reply || !reply.ok || !hasDungeonRoomSnapshot(reply.data)) {
+    return reply;
+  }
+
+  const mapView = await buildDungeonMapView({
+    data: reply.data,
+    user_id: userId,
+    view_state: storedView && storedView.view_state ? storedView.view_state : null,
+    content: options && options.map_content ? options.map_content : "",
+    suffix: options && options.suffix ? options.suffix : null
+  });
+  if (!mapView.ok) {
+    return reply;
+  }
+
+  const sessionId = cleanText(reply.data.session_id, cleanText(reply.data.session && reply.data.session.session_id, ""));
+  if (sessionId) {
+    setDungeonMapView(userId, sessionId, {
+      session_id: sessionId,
+      view_state: mapView.payload.view_state || { mode: "idle" },
+      map_config: mapView.payload.map_config,
+      dungeon_map: mapView.payload.dungeon_map || {},
+      data: clone(reply.data)
+    });
+  }
+
+  return Object.assign({}, reply, {
+    content: [reply.content, mapView.payload.content].filter(Boolean).join("\n\n"),
+    files: [].concat(Array.isArray(reply.files) ? reply.files : [], mapView.payload.files || []),
+    components: [].concat(Array.isArray(reply.components) ? reply.components : [], mapView.payload.components || [])
+  });
+}
+
 function buildStartCompleteEmbed(runtimeResult) {
   const reply = formatGatewayReplyFromRuntime(runtimeResult);
   const data = reply.data || {};
@@ -3138,11 +3310,25 @@ function isDungeonViewComponentInteraction(interaction) {
   return interaction.customId.startsWith("dungeon:view:");
 }
 
+function isDungeonMapComponentInteraction(interaction) {
+  if (!interaction || !interaction.customId) {
+    return false;
+  }
+  return interaction.customId.startsWith("dungeon-map:view:");
+}
+
 function isCombatViewComponentInteraction(interaction) {
   if (!interaction || !interaction.customId) {
     return false;
   }
   return interaction.customId.startsWith(CUSTOM_IDS.combatRefresh + ":");
+}
+
+function isCombatMapComponentInteraction(interaction) {
+  if (!interaction || !interaction.customId) {
+    return false;
+  }
+  return interaction.customId.startsWith("map-ui:");
 }
 
 async function handleInventoryComponent(interaction, runtime) {
@@ -3770,11 +3956,125 @@ async function handleDungeonViewComponent(interaction, runtime) {
 
   const runtimeResult = await runtime.processGatewayReadCommandEvent(event);
   const reply = formatGatewayReplyFromRuntime(runtimeResult);
-  await refreshInteractionMessage(interaction, {
-    content: reply.content,
-    embeds: Array.isArray(reply.embeds) ? reply.embeds : [],
-    components: Array.isArray(reply.components) ? reply.components : []
+  const nextReply = await attachDungeonMapToReply(reply, userId, getDungeonMapView(userId, sessionId), {
+    suffix: `dungeon-${mode}`
   });
+  await refreshInteractionMessage(interaction, {
+    content: nextReply.content,
+    embeds: Array.isArray(nextReply.embeds) ? nextReply.embeds : [],
+    components: Array.isArray(nextReply.components) ? nextReply.components : [],
+    files: Array.isArray(nextReply.files) ? nextReply.files : []
+  });
+}
+
+async function handleDungeonMapComponent(interaction, runtime) {
+  const userId = extractInteractionUser(interaction);
+  const parsed = parseDungeonMapCustomId(String(interaction.customId || ""));
+  if (!parsed.ok) {
+    await respondInteraction(interaction, { content: "Unknown dungeon map action." });
+    return;
+  }
+
+  const sessionId = parsed.session_id || null;
+  if (!userId || !sessionId) {
+    await respondInteraction(interaction, { content: "Dungeon map action is missing session context." });
+    return;
+  }
+
+  const storedView = getDungeonMapView(userId, sessionId);
+  if (!storedView || !storedView.data) {
+    await respondInteraction(interaction, { content: "No active dungeon map view found. Move or enter the dungeon again first." });
+    return;
+  }
+
+  if (parsed.action === DUNGEON_MAP_ACTIONS.PREVIEW_MOVE) {
+    const previewReply = await attachDungeonMapToReply({
+      ok: true,
+      content: storedView.data.room && storedView.data.room.name ? `Room: ${cleanText(storedView.data.room.name, storedView.data.room.room_id)}` : "Dungeon room loaded.",
+      embeds: [],
+      components: Array.isArray(buildDungeonRoomComponents(storedView.data)) ? buildDungeonRoomComponents(storedView.data) : [],
+      files: [],
+      data: storedView.data
+    }, userId, {
+      ...storedView,
+      view_state: { mode: "move_preview" }
+    }, {
+      map_content: "Choose a highlighted exit to move the party leader through the dungeon.",
+      suffix: "dungeon-move-preview"
+    });
+
+    await refreshInteractionMessage(interaction, {
+      content: previewReply.content,
+      embeds: Array.isArray(previewReply.embeds) ? previewReply.embeds : [],
+      components: Array.isArray(previewReply.components) ? previewReply.components : [],
+      files: Array.isArray(previewReply.files) ? previewReply.files : []
+    });
+    return;
+  }
+
+  if (parsed.action === DUNGEON_MAP_ACTIONS.BACK) {
+    const backReply = await attachDungeonMapToReply({
+      ok: true,
+      content: storedView.data.room && storedView.data.room.name ? `Room: ${cleanText(storedView.data.room.name, storedView.data.room.room_id)}` : "Dungeon room loaded.",
+      embeds: [],
+      components: Array.isArray(buildDungeonRoomComponents(storedView.data)) ? buildDungeonRoomComponents(storedView.data) : [],
+      files: [],
+      data: storedView.data
+    }, userId, {
+      ...storedView,
+      view_state: { mode: "idle" }
+    }, {
+      map_content: "Dungeon map ready.",
+      suffix: "dungeon-idle"
+    });
+
+    await refreshInteractionMessage(interaction, {
+      content: backReply.content,
+      embeds: Array.isArray(backReply.embeds) ? backReply.embeds : [],
+      components: Array.isArray(backReply.components) ? backReply.components : [],
+      files: Array.isArray(backReply.files) ? backReply.files : []
+    });
+    return;
+  }
+
+  if (parsed.action === DUNGEON_MAP_ACTIONS.MOVE) {
+    const direction = parsed.value || null;
+    const action = createDungeonMapMoveDirectionAction({
+      actor_id: cleanText(storedView.data && storedView.data.session && storedView.data.session.leader_id, userId),
+      instance_id: sessionId,
+      instance_type: "dungeon",
+      map_id: cleanText(storedView.data && storedView.data.dungeon_map && storedView.data.dungeon_map.map_id, ""),
+      source: "gateway.discord.map"
+    }, direction);
+    const adapted = adaptDungeonMapActionToCanonicalEvent(action, {
+      source: "gateway.discord.map",
+      player_id: userId,
+      session_id: sessionId
+    });
+    if (!adapted.ok || !adapted.payload || !adapted.payload.dispatch_required || !adapted.payload.event) {
+      await respondInteraction(interaction, { content: "Dungeon map move could not be prepared." });
+      return;
+    }
+
+    const runtimeResult = await runtime.processGatewayReadCommandEvent(adapted.payload.event);
+    const reply = formatGatewayReplyFromRuntime(runtimeResult);
+    const nextReply = await attachDungeonMapToReply(reply, userId, {
+      ...storedView,
+      view_state: { mode: "idle" }
+    }, {
+      suffix: "dungeon-map-move"
+    });
+
+    await refreshInteractionMessage(interaction, {
+      content: nextReply.content,
+      embeds: Array.isArray(nextReply.embeds) ? nextReply.embeds : [],
+      components: Array.isArray(nextReply.components) ? nextReply.components : [],
+      files: Array.isArray(nextReply.files) ? nextReply.files : []
+    });
+    return;
+  }
+
+  await respondInteraction(interaction, { content: "Unknown dungeon map action." });
 }
 
 async function handleCombatViewComponent(interaction, runtime) {
@@ -3799,10 +4099,113 @@ async function handleCombatViewComponent(interaction, runtime) {
 
   const runtimeResult = await runtime.processGatewayReadCommandEvent(event);
   const reply = formatGatewayReplyFromRuntime(runtimeResult);
+  const nextReply = await attachCombatMapToReply(reply, userId, getCombatMapView(userId, combatId), {
+    suffix: "combat-refresh"
+  });
   await refreshInteractionMessage(interaction, {
-    content: reply.content,
-    embeds: Array.isArray(reply.embeds) ? reply.embeds : [],
-    components: Array.isArray(reply.components) ? reply.components : []
+    content: nextReply.content,
+    embeds: Array.isArray(nextReply.embeds) ? nextReply.embeds : [],
+    components: Array.isArray(nextReply.components) ? nextReply.components : [],
+    files: Array.isArray(nextReply.files) ? nextReply.files : []
+  });
+}
+
+async function handleCombatMapComponent(interaction, runtime) {
+  const userId = extractInteractionUser(interaction);
+  const storedCombatId = String(interaction.customId || "").split(":")[3] || null;
+  const storedView = storedCombatId ? getCombatMapView(userId, storedCombatId) : null;
+  const combatId = storedCombatId || (storedView && storedView.combat_id) || null;
+
+  if (!userId || !combatId) {
+    await respondInteraction(interaction, { content: "Combat map action is missing combat context." });
+    return;
+  }
+
+  const readEvent = buildCombatReadEvent(userId, combatId);
+  const runtimeResult = await runtime.processGatewayReadCommandEvent(readEvent);
+  const reply = formatGatewayReplyFromRuntime(runtimeResult);
+  if (!reply.ok || !hasCombatSummary(reply.data)) {
+    await refreshInteractionMessage(interaction, {
+      content: reply.content,
+      embeds: Array.isArray(reply.embeds) ? reply.embeds : [],
+      components: Array.isArray(reply.components) ? reply.components : []
+    });
+    return;
+  }
+
+  const contextOut = buildMapInteractionContext({
+    view: storedView || {},
+    data: reply.data,
+    user_id: userId,
+    message_id: interaction.message && interaction.message.id ? String(interaction.message.id) : ""
+  });
+  if (!contextOut.ok) {
+    await respondInteraction(interaction, { content: contextOut.error || "Combat map context could not be built." });
+    return;
+  }
+
+  const controllerOut = handleCombatMapButtonAction(contextOut.payload, interaction.customId);
+  if (!controllerOut.ok) {
+    await respondInteraction(interaction, { content: controllerOut.error || "Combat map action failed." });
+    return;
+  }
+
+  const nextTokenOverrides = buildTokenVisualOverrides(
+    (controllerOut.map && controllerOut.map.tokens)
+      || (controllerOut.preview_map && controllerOut.preview_map.tokens)
+      || contextOut.payload.map.tokens
+  );
+
+  if (controllerOut.action_contract) {
+    const adapted = adaptMapActionToCanonicalEvent(controllerOut.action_contract, {
+      player_id: userId,
+      source: "gateway.discord.map"
+    });
+    if (!adapted.ok) {
+      await respondInteraction(interaction, { content: adapted.error || "Combat map action could not be adapted." });
+      return;
+    }
+
+    if (adapted.payload.dispatch_required === true && adapted.payload.event) {
+      const actionRuntimeResult = await runtime.processGatewayReadCommandEvent(adapted.payload.event);
+      const actionReply = formatGatewayReplyFromRuntime(actionRuntimeResult);
+      const hydratedActionReply = await attachCombatMapToReply(actionReply, userId, {
+        combat_id: combatId,
+        token_overrides: nextTokenOverrides,
+        interaction_state: null,
+        token_catalog: storedView && storedView.token_catalog ? storedView.token_catalog : []
+      }, {
+        suffix: "combat-action"
+      });
+      await refreshInteractionMessage(interaction, {
+        content: hydratedActionReply.content,
+        embeds: Array.isArray(hydratedActionReply.embeds) ? hydratedActionReply.embeds : [],
+        components: Array.isArray(hydratedActionReply.components) ? hydratedActionReply.components : [],
+        files: Array.isArray(hydratedActionReply.files) ? hydratedActionReply.files : []
+      });
+      return;
+    }
+  }
+
+  const previewReply = await attachCombatMapToReply(reply, userId, {
+    combat_id: combatId,
+    token_overrides: nextTokenOverrides,
+    interaction_state: controllerOut.state || null,
+    token_catalog: storedView && storedView.token_catalog ? storedView.token_catalog : []
+  }, {
+    map_content: controllerOut.payload && controllerOut.payload.content ? controllerOut.payload.content : "",
+    component_rows: controllerOut.payload && Array.isArray(controllerOut.payload.components)
+      ? controllerOut.payload.components
+      : null,
+    map_override: controllerOut.preview_map || controllerOut.map || contextOut.payload.map,
+    suffix: controllerOut.state && controllerOut.state.mode ? controllerOut.state.mode : "preview"
+  });
+
+  await refreshInteractionMessage(interaction, {
+    content: previewReply.content,
+    embeds: Array.isArray(previewReply.embeds) ? previewReply.embeds : [],
+    components: Array.isArray(previewReply.components) ? previewReply.components : [],
+    files: Array.isArray(previewReply.files) ? previewReply.files : []
   });
 }
 
@@ -3893,8 +4296,28 @@ async function handleGatewayInteraction(interaction, runtime) {
         };
       }
 
+      if (isButton && isDungeonMapComponentInteraction(interaction)) {
+        await handleDungeonMapComponent(interaction, runtime);
+        return {
+          ok: true,
+          event_type: "gateway_interaction_processed",
+          payload: { custom_id: interaction.customId },
+          error: null
+        };
+      }
+
       if (isButton && isCombatViewComponentInteraction(interaction)) {
         await handleCombatViewComponent(interaction, runtime);
+        return {
+          ok: true,
+          event_type: "gateway_interaction_processed",
+          payload: { custom_id: interaction.customId },
+          error: null
+        };
+      }
+
+      if (isButton && isCombatMapComponentInteraction(interaction)) {
+        await handleCombatMapComponent(interaction, runtime);
         return {
           ok: true,
           event_type: "gateway_interaction_processed",
@@ -3967,6 +4390,22 @@ async function handleGatewayInteraction(interaction, runtime) {
 
     const runtimeResult = await runtime.processGatewayReadCommandEvent(internalEvent);
     const reply = formatGatewayReplyFromRuntime(runtimeResult);
+    const combatHydratedReply = await attachCombatMapToReply(reply, extractInteractionUser(interaction), null, {
+      suffix: internalEvent.payload && internalEvent.payload.command_name
+        ? String(internalEvent.payload.command_name)
+        : "combat"
+    });
+    const requestSessionId = internalEvent.session_id || (internalEvent.payload && internalEvent.payload.session_id) || null;
+    const nextReply = await attachDungeonMapToReply(
+      combatHydratedReply,
+      extractInteractionUser(interaction),
+      requestSessionId ? getDungeonMapView(extractInteractionUser(interaction), requestSessionId) : null,
+      {
+      suffix: internalEvent.payload && internalEvent.payload.command_name
+        ? String(internalEvent.payload.command_name)
+        : "dungeon"
+      }
+    );
     if (internalEvent.event_type === EVENT_TYPES.PLAYER_PROFILE_REQUESTED && reply.ok && reply.data && reply.data.profile_found === true) {
       setProfileView(extractInteractionUser(interaction), {
         data: reply.data,
@@ -4002,21 +4441,22 @@ async function handleGatewayInteraction(interaction, runtime) {
       });
     }
     await sendEphemeralReply(interaction, {
-      content: reply.content,
-      embeds: Array.isArray(reply.embeds) ? reply.embeds : []
+      content: nextReply.content,
+      embeds: Array.isArray(nextReply.embeds) ? nextReply.embeds : []
       ,
-      components: Array.isArray(reply.components) ? reply.components : []
+      components: Array.isArray(nextReply.components) ? nextReply.components : [],
+      files: Array.isArray(nextReply.files) ? nextReply.files : []
     });
 
     return {
-      ok: reply.ok,
+      ok: nextReply.ok,
       event_type: "gateway_interaction_processed",
       payload: {
         command_name: internalEvent.payload ? internalEvent.payload.command_name : null,
         request_event: internalEvent,
         runtime_result: runtimeResult
       },
-      error: reply.ok ? null : reply.content
+      error: nextReply.ok ? null : nextReply.content
     };
   } catch (error) {
     console.error(

@@ -12,7 +12,8 @@
       "aliases": ["bush", "brush_patch", "thicket_light"],
       "blocks_movement": false,
       "blocks_sight": false,
-      "movement_cost": 2
+      "movement_cost": 2,
+      "cover_level": "half"
     },
     {
       "terrain_type": "tree",
@@ -26,35 +27,40 @@
       "aliases": ["stone", "rocks", "rubble_large"],
       "blocks_movement": true,
       "blocks_sight": false,
-      "movement_cost": 1
+      "movement_cost": 1,
+      "cover_level": "half"
     },
     {
       "terrain_type": "boulder",
       "aliases": ["boulder_large", "boulder_small"],
       "blocks_movement": true,
       "blocks_sight": true,
-      "movement_cost": 1
+      "movement_cost": 1,
+      "cover_level": "total"
     },
     {
       "terrain_type": "pillar",
       "aliases": ["column", "obelisk"],
       "blocks_movement": true,
       "blocks_sight": true,
-      "movement_cost": 1
+      "movement_cost": 1,
+      "cover_level": "total"
     },
     {
       "terrain_type": "fence",
       "aliases": ["hedge", "barricade_low"],
       "blocks_movement": true,
       "blocks_sight": false,
-      "movement_cost": 1
+      "movement_cost": 1,
+      "cover_level": "half"
     },
     {
       "terrain_type": "wall",
       "aliases": ["stone_wall", "wood_wall", "brick_wall"],
       "blocks_movement": true,
       "blocks_sight": true,
-      "movement_cost": 1
+      "movement_cost": 1,
+      "cover_level": "total"
     },
     {
       "terrain_type": "impassable",
@@ -69,6 +75,28 @@
       "blocks_movement": true,
       "blocks_sight": false,
       "movement_cost": 1
+    },
+    {
+      "terrain_type": "shallow_water",
+      "aliases": ["ford", "wading_water"],
+      "blocks_movement": false,
+      "blocks_sight": false,
+      "movement_cost": 2
+    },
+    {
+      "terrain_type": "mud",
+      "aliases": ["bog", "mire"],
+      "blocks_movement": false,
+      "blocks_sight": false,
+      "movement_cost": 2
+    },
+    {
+      "terrain_type": "rubble",
+      "aliases": ["debris", "broken_stone", "broken_wall"],
+      "blocks_movement": false,
+      "blocks_sight": false,
+      "movement_cost": 2,
+      "cover_level": "half"
     },
     {
       "terrain_type": "pit",
@@ -101,9 +129,45 @@
     {
       "terrain_type": "lava",
       "aliases": ["magma", "molten"],
-      "blocks_movement": true,
+      "blocks_movement": false,
       "blocks_sight": false,
-      "movement_cost": 1
+      "movement_cost": 1,
+      "is_hazard": true,
+      "hazard_kind": "fire",
+      "damages_on_enter": true,
+      "damages_on_turn_start": true
+    },
+    {
+      "terrain_type": "fire",
+      "aliases": ["flame", "burning_ground"],
+      "blocks_movement": false,
+      "blocks_sight": false,
+      "movement_cost": 1,
+      "is_hazard": true,
+      "hazard_kind": "fire",
+      "damages_on_enter": true,
+      "damages_on_turn_start": true
+    },
+    {
+      "terrain_type": "acid",
+      "aliases": ["acid_pool", "caustic"],
+      "blocks_movement": false,
+      "blocks_sight": false,
+      "movement_cost": 1,
+      "is_hazard": true,
+      "hazard_kind": "acid",
+      "damages_on_enter": true,
+      "damages_on_turn_start": true
+    },
+    {
+      "terrain_type": "spikes",
+      "aliases": ["caltrops", "barbs", "spike_trap"],
+      "blocks_movement": false,
+      "blocks_sight": false,
+      "movement_cost": 2,
+      "is_hazard": true,
+      "hazard_kind": "piercing",
+      "damages_on_enter": true
     }
   ]
 }

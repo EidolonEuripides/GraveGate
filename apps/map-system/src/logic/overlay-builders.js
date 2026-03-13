@@ -4,6 +4,7 @@ const { OVERLAY_KINDS, DISTANCE_METRICS, MOVEMENT_RULES } = require("../constant
 const { getReachableTiles } = require("./movement");
 const { getTilesInRange } = require("./range");
 const { getValidAttackTargets } = require("./attacks");
+const { buildHazardTileList } = require("./terrain");
 const { buildSpellAreaTiles } = require("../spells/spell-area");
 const { resolveActorMovementSpeedFeet } = require("./actor-movement");
 
@@ -167,6 +168,27 @@ function buildSelectionOverlay(options) {
   };
 }
 
+function buildHazardOverlay(options) {
+  const hazardTiles = Array.isArray(options.tiles)
+    ? options.tiles
+    : buildHazardTileList(options.map);
+
+  return {
+    overlay_id: options.overlay_id || "hazard-overlay",
+    kind: OVERLAY_KINDS.HAZARD,
+    color: normalizeOverlayColor(options.color, "#ff9f0a"),
+    opacity: typeof options.opacity === "number" ? options.opacity : 0.42,
+    tiles: hazardTiles.map((tile) => ({
+      x: tile.x,
+      y: tile.y,
+      label: tile.hazard_kind ? String(tile.hazard_kind).slice(0, 3).toUpperCase() : "HZD"
+    })),
+    metadata: {
+      hazard_count: hazardTiles.length
+    }
+  };
+}
+
 module.exports = {
   buildMovementOverlay,
   buildActorMovementOverlay,
@@ -174,5 +196,6 @@ module.exports = {
   buildPhysicalRangeOverlay,
   buildSpellRangeOverlay,
   buildSpellAreaOverlay,
-  buildSelectionOverlay
+  buildSelectionOverlay,
+  buildHazardOverlay
 };
