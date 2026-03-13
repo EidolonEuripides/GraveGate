@@ -26,5 +26,20 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run main gate
-        run: npm run gate:main
+      - name: Run command definitions gate
+        run: node apps/gateway/src/testing/commandDefinitions.test.js
+
+      - name: Run command mapper gate
+        run: node apps/gateway/src/testing/commandEventMapper.test.js
+
+      - name: Run map-system gate
+        run: node apps/map-system/src/testing/mapSystem.test.js
+
+      - name: Run gateway integration gate
+        run: node apps/gateway/src/testing/gatewayRuntimeIntegration.test.js
+
+      - name: Run runtime gate
+        run: node apps/runtime/src/testing/readCommandRuntime.test.js
+
+      - name: Run combat gate
+        run: node apps/combat-system/src/testing/processCombatActionRequest.test.js
