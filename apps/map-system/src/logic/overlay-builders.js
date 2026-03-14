@@ -152,7 +152,8 @@ function buildSpellAreaOverlay(options) {
     tiles: tiles.map((tile) => ({ x: tile.x, y: tile.y })),
     metadata: {
       shape: options.profile && options.profile.shape || "",
-      area_size_feet: options.profile && options.profile.area_size_feet || 0
+      area_size_feet: options.profile && options.profile.area_size_feet || 0,
+      line_width_feet: options.profile && options.profile.line_width_feet || 0
     }
   };
 }

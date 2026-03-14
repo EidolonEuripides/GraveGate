@@ -199,11 +199,6 @@ function applyTokenOverrides(tokens, tokenOverrides) {
     return Object.assign({}, token, {
       asset_path: cleanText(override.asset_path, token.asset_path || ""),
       color: cleanText(override.color, token.color || ""),
-      border_color: cleanText(override.border_color, token.border_color || ""),
-      image_border_color: cleanText(
-        override.image_border_color || override.image_rim_color,
-        token.image_border_color || ""
-      ),
       shape: cleanText(override.shape, token.shape || "")
     });
   });
@@ -327,8 +322,6 @@ function buildTokenVisualOverrides(tokens) {
   return (Array.isArray(tokens) ? tokens : []).map((token) => ({
     token_id: token.token_id,
     asset_path: token.asset_path || null,
-    border_color: token.border_color || null,
-    image_border_color: token.image_border_color || token.image_rim_color || null,
     color: token.color || null,
     shape: token.shape || null
   }));

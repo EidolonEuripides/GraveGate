@@ -35,7 +35,7 @@ function normalizeSpellId(spell) {
 
 function isSupportedAreaTargetType(targetType) {
   return /^(cone|cube|sphere|aura)_\d+(ft)?$/.test(String(targetType || "")) ||
-    /^line_\d+(ft)?_\d+(ft)?$/.test(String(targetType || ""));
+    /^line_\d+(ft)?(?:_\d+(ft)?)?$/.test(String(targetType || ""));
 }
 
 function getCombatMapSpellSupport(spell) {

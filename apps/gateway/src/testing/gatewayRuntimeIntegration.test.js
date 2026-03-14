@@ -3,6 +3,7 @@
 const assert = require("assert");
 const path = require("path");
 const { handleGatewayInteraction, __test } = require("../index");
+const { buildCombatMapState, buildTokenVisualOverrides } = require("../combatMapView");
 const { buildDungeonMapState } = require("../dungeonMapView");
 
 async function runTest(name, fn, results) {
@@ -3222,6 +3223,78 @@ async function runGatewayRuntimeIntegrationTests() {
     assert.equal(String(confirmInteraction._followUpCalls[0].content).includes("Target: Goblin 1"), true);
     assert.equal(String(confirmInteraction._followUpCalls[0].content).includes("Next Turn: Goblin 1 | HP 3/7"), true);
     assert.deepEqual(confirmInteraction._followUpCalls[0].allowedMentions, { parse: [] });
+    assert.equal(confirmInteraction._followUpCalls[0].ephemeral, true);
+  }, results);
+
+  await runTest("gateway_token_visual_overrides_do_not_freeze_active_turn_borders", async () => {
+    const mapConfig = {
+      map_path: path.resolve(process.cwd(), "apps/map-system/data/maps/combat/map-12x12.base-map.json"),
+      profile_path: ""
+    };
+    const activeMonsterSummary = {
+      combat_id: "combat-gateway-border-sync-001",
+      status: "active",
+      round: 2,
+      active_participant_id: "monster-001",
+      participants: [
+        {
+          participant_id: "hero-001",
+          name: "Aelar",
+          player_id: "player-gateway-border-sync-001",
+          team: "heroes",
+          current_hp: 14,
+          max_hp: 14,
+          position: { x: 1, y: 1 },
+          conditions: []
+        },
+        {
+          participant_id: "monster-001",
+          name: "Goblin 1",
+          team: "monsters",
+          current_hp: 7,
+          max_hp: 7,
+          position: { x: 2, y: 1 },
+          conditions: []
+        }
+      ]
+    };
+
+    const firstState = buildCombatMapState({
+      combat_summary: activeMonsterSummary,
+      map_config: mapConfig,
+      token_overrides: [
+        {
+          token_id: "hero-001",
+          asset_path: "apps/map-system/assets/tokens/players/processed/male-tiefling-03.cleaned.png",
+          color: "#123456",
+          shape: "square"
+        }
+      ],
+      user_id: "player-gateway-border-sync-001"
+    });
+    assert.equal(firstState.ok, true);
+
+    const cachedOverrides = buildTokenVisualOverrides(firstState.payload.map.tokens);
+    const nextTurnSummary = Object.assign({}, activeMonsterSummary, {
+      round: 3,
+      active_participant_id: "hero-001"
+    });
+    const secondState = buildCombatMapState({
+      combat_summary: nextTurnSummary,
+      map_config: mapConfig,
+      token_overrides: cachedOverrides,
+      user_id: "player-gateway-border-sync-001"
+    });
+    assert.equal(secondState.ok, true);
+
+    const hero = secondState.payload.map.tokens.find((token) => token.token_id === "hero-001");
+    const monster = secondState.payload.map.tokens.find((token) => token.token_id === "monster-001");
+    assert.equal(hero.asset_path, "apps/map-system/assets/tokens/players/processed/male-tiefling-03.cleaned.png");
+    assert.equal(hero.color, "#123456");
+    assert.equal(hero.shape, "square");
+    assert.equal(hero.border_color, "#ffd166");
+    assert.equal(monster.border_color, null);
+    assert.equal(monster.image_border_color, null);
   }, results);
 
   await runTest("gateway_uses_runtime_failure_response_shape_for_replies", async () => {

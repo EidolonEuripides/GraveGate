@@ -1544,6 +1544,32 @@ function runMapSystemTests() {
     ]);
   }, results);
 
+  runTest("spell_area_tiles_honor_line_width_when_present", () => {
+    const map = createTestMap();
+    const profile = buildSpellTargetingProfile({
+      spell_id: "lightning_lance",
+      name: "Lightning Lance",
+      range: "self",
+      targeting: { type: "line_15ft_10ft" }
+    });
+
+    const tiles = buildSpellAreaTiles({
+      map,
+      origin: { x: 0, y: 0 },
+      profile,
+      target_position: { x: 4, y: 0 }
+    });
+
+    assert.deepEqual(tiles, [
+      { x: 1, y: 0 },
+      { x: 1, y: 1 },
+      { x: 2, y: 0 },
+      { x: 2, y: 1 },
+      { x: 3, y: 0 },
+      { x: 3, y: 1 }
+    ]);
+  }, results);
+
   runTest("spell_area_tiles_build_sphere_on_target_point", () => {
     const map = createTestMap();
     const profile = buildSpellTargetingProfile({
@@ -1585,15 +1611,16 @@ function runMapSystemTests() {
       { spell_id: "fire_bolt", name: "Fire Bolt", level: 0, casting_time: "1 action", range: "120 feet", targeting: { type: "single_target" } },
       { spell_id: "bless", name: "Bless", level: 1, casting_time: "1 action", range: "30 feet", targeting: { type: "up_to_three_allies" } },
       { spell_id: "shield", name: "Shield", level: 1, casting_time: "1 reaction", range: "self", targeting: { type: "self" } },
-      { spell_id: "light", name: "Light", level: 0, casting_time: "1 action", range: "touch", targeting: { type: "object" } }
+      { spell_id: "light", name: "Light", level: 0, casting_time: "1 action", range: "touch", targeting: { type: "object" } },
+      { spell_id: "lightning_bolt", name: "Lightning Bolt", level: 3, casting_time: "1 action", range: "self", targeting: { type: "line_15ft" } }
     ];
     const actor = {
-      known_spell_ids: ["fire_bolt", "bless", "shield", "light"]
+      known_spell_ids: ["fire_bolt", "bless", "shield", "light", "lightning_bolt"]
     };
 
     const partition = listActorCombatMapSpells({ actor, spells });
 
-    assert.deepEqual(partition.supported.map((entry) => entry.spell_id), ["fire_bolt", "light", "bless", "shield"]);
+    assert.deepEqual(partition.supported.map((entry) => entry.spell_id), ["fire_bolt", "light", "bless", "shield", "lightning_bolt"]);
     assert.equal(partition.unsupported.length, 0);
   }, results);
 
@@ -1610,6 +1637,12 @@ function runMapSystemTests() {
       casting_time: "1 reaction",
       targeting: { type: "self" }
     });
+    const lineSupport = getCombatMapSpellSupport({
+      spell_id: "lightning_bolt",
+      name: "Lightning Bolt",
+      casting_time: "1 action",
+      targeting: { type: "line_15ft" }
+    });
     const unsupportedSupport = getCombatMapSpellSupport({
       spell_id: "mystery_spell",
       name: "Mystery Spell",
@@ -1624,6 +1657,7 @@ function runMapSystemTests() {
 
     assert.equal(blessSupport.supported, true);
     assert.equal(shieldSupport.supported, true);
+    assert.equal(lineSupport.supported, true);
     assert.equal(unsupportedSupport.supported, false);
     assert.equal(String(unsupportedSupport.reason).includes("does not understand yet"), true);
     assert.deepEqual(partition.supported.map((entry) => entry.spell_id), ["fire_bolt", "shield"]);
@@ -1859,6 +1893,44 @@ function runMapSystemTests() {
     assert.equal(out.ok, true);
     assert.deepEqual(out.payload.target_position, { x: 3, y: 2 });
     assert.equal(out.payload.confirmed_area_tiles.length > 0, true);
+  }, results);
+
+  runTest("line_spell_preview_and_confirmation_preserve_line_width_tiles", () => {
+    const map = createTestMap();
+    map.tokens[0].team = "heroes";
+    map.tokens[0].position = { x: 0, y: 0 };
+
+    const spells = [
+      {
+        spell_id: "lightning_lance",
+        name: "Lightning Lance",
+        range: "self",
+        targeting: { type: "line_15ft_10ft" }
+      }
+    ];
+
+    const preview = buildSpellPreviewState({
+      map,
+      actor: map.tokens[0],
+      spells,
+      spell_id: "lightning_lance",
+      target_position: { x: 4, y: 0 }
+    });
+    const confirmation = confirmSpellSelection({
+      map,
+      actor: map.tokens[0],
+      spells,
+      spell_id: "lightning_lance",
+      target_position: preview.ok ? preview.payload.target_position : null,
+      confirmed_area_tiles: preview.ok ? preview.payload.confirmed_area_tiles : []
+    });
+
+    assert.equal(preview.ok, true);
+    assert.equal(preview.payload.confirmed_area_tiles.some((tile) => tile.x === 1 && tile.y === 1), true);
+    assert.equal(preview.payload.confirmed_area_tiles.some((tile) => tile.x === 3 && tile.y === 1), true);
+    assert.equal(preview.payload.area_overlay.width_feet, 10);
+    assert.equal(confirmation.ok, true);
+    assert.equal(confirmation.payload.confirmed_area_tiles.some((tile) => tile.x === 2 && tile.y === 1), true);
   }, results);
 
   runTest("split_target_spells_accumulate_multiple_target_selections", () => {

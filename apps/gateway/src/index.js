@@ -3584,18 +3584,6 @@ async function refreshInteractionMessage(interaction, payload) {
   await respondInteraction(interaction, safePayload);
 }
 
-async function sendInteractionFollowUp(interaction, payload) {
-  const safePayload = Object.assign({}, payload);
-  delete safePayload.ephemeral;
-
-  if (typeof interaction.followUp === "function") {
-    await interaction.followUp(safePayload);
-    return;
-  }
-
-  await refreshInteractionMessage(interaction, safePayload);
-}
-
 function syncSessionPointBuy(session) {
   const safe = session || {};
   const stats =
@@ -4785,7 +4773,7 @@ async function handleCombatMapComponent(interaction, runtime) {
         files: Array.isArray(hydratedActionReply.files) ? hydratedActionReply.files : []
       });
       if (turnSummaryContent) {
-        await sendInteractionFollowUp(interaction, {
+        await sendEphemeralReply(interaction, {
           content: turnSummaryContent,
           allowedMentions: { parse: [] }
         });
