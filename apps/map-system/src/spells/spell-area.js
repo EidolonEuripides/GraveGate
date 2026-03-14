@@ -186,7 +186,7 @@ function resolveAreaAnchor(options) {
     return clampPointToMap(options.map, options.valid_targets[0]);
   }
 
-  if (options.profile.shape === SPELL_TARGETING_SHAPES.SELF) {
+  if ([SPELL_TARGETING_SHAPES.SELF, SPELL_TARGETING_SHAPES.AURA].includes(options.profile.shape)) {
     return clampPointToMap(options.map, options.origin);
   }
 
@@ -218,6 +218,10 @@ function buildSpellAreaTiles(options) {
 
   if (profile.shape === SPELL_TARGETING_SHAPES.SELF) {
     return buildSelfTiles(origin);
+  }
+
+  if (profile.shape === SPELL_TARGETING_SHAPES.AURA) {
+    return buildSphereTiles(map, origin, areaSizeTiles);
   }
 
   if (profile.shape === SPELL_TARGETING_SHAPES.SPHERE) {
