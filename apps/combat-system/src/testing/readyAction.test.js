@@ -133,6 +133,31 @@ function runReadyActionTests() {
     assert.equal(out.error, "unsupported readied_action_type");
   }, results);
 
+  runTest("ready_rejects_incapacitated_actor", () => {
+    const manager = createActiveCombatForReadyTests();
+    const combat = manager.getCombatById("combat-ready-001").payload.combat;
+    combat.conditions = [
+      {
+        condition_id: "condition-ready-stunned-001",
+        condition_type: "stunned",
+        target_actor_id: "p1"
+      }
+    ];
+    manager.combats.set("combat-ready-001", combat);
+
+    const out = performReadyAction({
+      combatManager: manager,
+      combat_id: "combat-ready-001",
+      participant_id: "p1",
+      trigger_type: "enemy_enters_reach",
+      readied_action_type: "attack",
+      target_id: "p2"
+    });
+
+    assert.equal(out.ok, false);
+    assert.equal(out.error, "stunned participants cannot act");
+  }, results);
+
   const passed = results.filter((x) => x.ok).length;
   const failed = results.length - passed;
   return {

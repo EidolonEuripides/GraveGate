@@ -108,6 +108,28 @@ function runDisengageActionTests() {
     }), false);
   }, results);
 
+  runTest("disengage_rejects_incapacitated_actor", () => {
+    const manager = createActiveCombatForDisengageTests();
+    const combat = manager.getCombatById("combat-disengage-001").payload.combat;
+    combat.conditions = [
+      {
+        condition_id: "condition-disengage-stunned-001",
+        condition_type: "stunned",
+        target_actor_id: "p1"
+      }
+    ];
+    manager.combats.set("combat-disengage-001", combat);
+
+    const out = performDisengageAction({
+      combatManager: manager,
+      combat_id: "combat-disengage-001",
+      participant_id: "p1"
+    });
+
+    assert.equal(out.ok, false);
+    assert.equal(out.error, "stunned participants cannot act");
+  }, results);
+
   const passed = results.filter((x) => x.ok).length;
   const failed = results.length - passed;
   return {

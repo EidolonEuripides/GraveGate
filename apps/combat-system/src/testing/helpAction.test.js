@@ -94,6 +94,29 @@ function runHelpActionTests() {
     assert.equal(out.error, "help action requires an ally target");
   }, results);
 
+  runTest("help_rejects_incapacitated_helper", () => {
+    const manager = createActiveCombatForHelpTests();
+    const combat = manager.getCombatById("combat-help-001").payload.combat;
+    combat.conditions = [
+      {
+        condition_id: "condition-help-paralyzed-001",
+        condition_type: "paralyzed",
+        target_actor_id: "p1"
+      }
+    ];
+    manager.combats.set("combat-help-001", combat);
+
+    const out = performHelpAction({
+      combatManager: manager,
+      combat_id: "combat-help-001",
+      helper_id: "p1",
+      target_id: "p2"
+    });
+
+    assert.equal(out.ok, false);
+    assert.equal(out.error, "paralyzed participants cannot act");
+  }, results);
+
   const passed = results.filter((x) => x.ok).length;
   const failed = results.length - passed;
   return {

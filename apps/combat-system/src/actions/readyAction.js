@@ -5,6 +5,7 @@ const {
   consumeParticipantAction,
   validateParticipantActionAvailability
 } = require("./actionEconomy");
+const { getParticipantIncapacitationType } = require("../conditions/conditionHelpers");
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -106,6 +107,14 @@ function performReadyAction(input) {
       combat_id: String(combatId),
       participant_id: String(participantId),
       current_hp: actorHp
+    });
+  }
+  const incapacitationType = getParticipantIncapacitationType(combat, participantId);
+  if (incapacitationType) {
+    return failure("ready_action_failed", `${incapacitationType} participants cannot act`, {
+      combat_id: String(combatId),
+      participant_id: String(participantId),
+      incapacitating_condition: incapacitationType
     });
   }
 

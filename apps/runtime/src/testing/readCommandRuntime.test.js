@@ -2698,7 +2698,11 @@ async function runReadCommandRuntimeTests() {
     const adapter = createInMemoryAdapter();
     const combatManager = new CombatManager();
     const combatPersistence = new CombatPersistenceBridge({ adapter });
-    const runtime = createReadCommandRuntime({ combatManager, combatPersistence });
+    const runtime = createReadCommandRuntime({
+      combatManager,
+      combatPersistence,
+      attackRollFn: () => 20
+    });
     const playerId = "player-runtime-attack-001";
     const combatId = "combat-runtime-attack-001";
     createActiveCombat(combatManager, combatId, playerId, "enemy-runtime-attack-001");
@@ -2714,6 +2718,8 @@ async function runReadCommandRuntimeTests() {
     assert.equal(response.payload.ok, true);
     assert.equal(response.combat_id, combatId);
     assert.equal(response.payload.data.target_id, "enemy-runtime-attack-001");
+    assert.equal(response.payload.data.damage_type, "bludgeoning");
+    assert.equal(Boolean(response.payload.data.damage_result), true);
     assert.equal(response.payload.data.combat_summary.combat_id, combatId);
     assert.equal(Array.isArray(response.payload.data.combat_summary.participants), true);
 
@@ -2776,6 +2782,35 @@ async function runReadCommandRuntimeTests() {
     const playerId = "player-runtime-combat-read-001";
     const combatId = "combat-runtime-read-001";
     createActiveCombat(combatManager, combatId, playerId, "enemy-runtime-read-001");
+    const seededCombat = combatManager.getCombatById(combatId).payload.combat;
+    seededCombat.participants[0].concentration = {
+      is_concentrating: true,
+      source_spell_id: "shield_of_faith",
+      started_at_round: 1
+    };
+    seededCombat.conditions = [
+      {
+        condition_id: "condition-runtime-read-001",
+        condition_type: "bless",
+        target_actor_id: playerId
+      }
+    ];
+    seededCombat.event_log = [
+      {
+        event_type: "attack_action",
+        attacker_id: playerId,
+        target_id: "enemy-runtime-read-001",
+        hit: true,
+        damage_dealt: 4
+      },
+      {
+        event_type: "move_action",
+        participant_id: "enemy-runtime-read-001",
+        from_position: { x: 2, y: 1 },
+        to_position: { x: 3, y: 1 }
+      }
+    ];
+    combatManager.combats.set(combatId, seededCombat);
     combatPersistence.saveCombatSnapshot({
       combat_state: combatManager.getCombatById(combatId).payload.combat
     });
@@ -2809,6 +2844,18 @@ async function runReadCommandRuntimeTests() {
     assert.equal(Array.isArray(response.payload.data.combat_summary.participants), true);
     assert.equal(Array.isArray(response.payload.data.actor_spells), true);
     assert.equal(response.payload.data.actor_spells.length, 0);
+    assert.deepEqual(response.payload.data.combat_summary.initiative_order, [playerId, "enemy-runtime-read-001"]);
+    assert.equal(response.payload.data.combat_summary.turn_index, 0);
+    const summaryHero = response.payload.data.combat_summary.participants.find((entry) => entry.participant_id === playerId);
+    assert.equal(summaryHero.name, "Runtime Player");
+    assert.equal(summaryHero.map_marker, "H1");
+    assert.equal(summaryHero.condition_count, 1);
+    assert.equal(summaryHero.concentration.is_concentrating, true);
+    assert.equal(summaryHero.concentration.source_spell_id, "shield_of_faith");
+    assert.equal(Array.isArray(response.payload.data.combat_summary.recent_events), true);
+    assert.equal(response.payload.data.combat_summary.recent_events[0].hit, true);
+    assert.equal(response.payload.data.combat_summary.recent_events[0].damage_dealt, 4);
+    assert.deepEqual(response.payload.data.combat_summary.recent_events[1].to_position, { x: 3, y: 1 });
   }, results);
 
   await runTest("duplicate_replay_cast_request_is_rejected_cleanly", async () => {
@@ -2906,6 +2953,7 @@ async function runReadCommandRuntimeTests() {
     assert.equal(response.payload.ok, true);
     assert.equal(response.combat_id, combatId);
     assert.equal(response.payload.data.item_id, "item-runtime-heal-001");
+    assert.equal(Array.isArray(response.payload.data.removed_conditions), true);
 
     const reloadedInventory = inventoryPersistence.listInventories();
     const playerInventory = reloadedInventory.payload.inventories.find((inventory) => {

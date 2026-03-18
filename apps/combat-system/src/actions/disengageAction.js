@@ -5,7 +5,10 @@ const {
   consumeParticipantAction,
   validateParticipantActionAvailability
 } = require("./actionEconomy");
-const { applyConditionToCombatState } = require("../conditions/conditionHelpers");
+const {
+  applyConditionToCombatState,
+  getParticipantIncapacitationType
+} = require("../conditions/conditionHelpers");
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -91,6 +94,14 @@ function performDisengageAction(input) {
       combat_id: String(combatId),
       participant_id: String(participantId),
       current_hp: actorHp
+    });
+  }
+  const incapacitationType = getParticipantIncapacitationType(combat, participantId);
+  if (incapacitationType) {
+    return failure("disengage_action_failed", `${incapacitationType} participants cannot act`, {
+      combat_id: String(combatId),
+      participant_id: String(participantId),
+      incapacitating_condition: incapacitationType
     });
   }
 

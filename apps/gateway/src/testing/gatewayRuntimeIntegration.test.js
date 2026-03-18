@@ -3,6 +3,7 @@
 const assert = require("assert");
 const path = require("path");
 const { handleGatewayInteraction, __test } = require("../index");
+const { buildCombatMapState, buildTokenVisualOverrides } = require("../combatMapView");
 const { buildDungeonMapState } = require("../dungeonMapView");
 
 async function runTest(name, fn, results) {
@@ -2264,15 +2265,22 @@ async function runGatewayRuntimeIntegrationTests() {
                     attacker_id: "hero-001",
                     target_id: "monster-001",
                     hit: true,
+                    damage_type: "slashing",
                     damage_dealt: 4,
+                    damage_result: {
+                      final_damage: 4,
+                      damage_type: "slashing",
+                      hp_before: 7,
+                      hp_after: 3
+                    },
                     target_hp_after: 3,
                     combat_summary: {
                       combat_id: "combat-gateway-attack-001",
                       round: 2,
                       active_participant_id: "hero-001",
                       participants: [
-                        { participant_id: "hero-001", current_hp: 9, max_hp: 12 },
-                        { participant_id: "monster-001", current_hp: 3, max_hp: 7 }
+                        { participant_id: "hero-001", name: "Aelar", current_hp: 9, max_hp: 12 },
+                        { participant_id: "monster-001", name: "Goblin 1", current_hp: 3, max_hp: 7 }
                       ]
                     },
                     active_participant_id: "hero-001",
@@ -2306,13 +2314,13 @@ async function runGatewayRuntimeIntegrationTests() {
     assert.equal(out.ok, true);
     assert.equal(interaction._replyCalls.length, 1);
     assert.equal(interaction._replyCalls[0].embeds[0].data.title, "Attack Resolved");
-    assert.equal(interaction._replyCalls[0].embeds[1].data.title, "Combat State");
-    assert.equal(String(interaction._replyCalls[0].embeds[0].data.description).includes("Result: Hit for 4"), true);
-    assert.equal(String(interaction._replyCalls[0].embeds[0].data.description).includes("Round: 2"), true);
-    assert.equal(String(interaction._replyCalls[0].embeds[0].data.description).includes("*hero-001 9/12 | monster-001 3/7"), true);
-    assert.equal(interaction._replyCalls[0].content.includes("Result: Hit for 4"), true);
-    assert.equal(interaction._replyCalls[0].content.includes("Next Turn: hero-001"), true);
-    assert.equal(interaction._replyCalls[0].content.includes("monster-001 struck at hero-001"), true);
+    assert.equal(interaction._replyCalls[0].embeds[1].data.title, "Battle Window");
+    assert.equal(String(interaction._replyCalls[0].embeds[0].data.fields[0].value).includes("Result: Hit"), true);
+    assert.equal(String(interaction._replyCalls[0].embeds[0].data.fields[1].value).includes("Damage: 4 slashing damage | HP 7 -> 3"), true);
+    assert.equal(String(interaction._replyCalls[0].embeds[0].data.fields[2].value).includes("Round: 2"), true);
+    assert.equal(interaction._replyCalls[0].content.includes("Result: Hit"), true);
+    assert.equal(interaction._replyCalls[0].content.includes("Next Turn: Aelar | HP 9/12"), true);
+    assert.equal(interaction._replyCalls[0].content.includes("Follow-Up: Goblin 1 attacked Aelar"), true);
   }, results);
 
   await runTest("gateway_formats_dodge_response_with_combat_state", async () => {
@@ -2364,8 +2372,9 @@ async function runGatewayRuntimeIntegrationTests() {
     assert.equal(out.ok, true);
     assert.equal(interaction._replyCalls.length, 1);
     assert.equal(interaction._replyCalls[0].embeds[0].data.title, "Dodge Taken");
-    assert.equal(interaction._replyCalls[0].embeds[1].data.title, "Combat State");
-    assert.equal(String(interaction._replyCalls[0].content).includes("Status: Dodging"), true);
+    assert.equal(interaction._replyCalls[0].embeds[1].data.title, "Battle Window");
+    assert.equal(String(interaction._replyCalls[0].embeds[0].data.fields[0].value).includes("Action: Dodge"), true);
+    assert.equal(String(interaction._replyCalls[0].content).includes("Result: Dodge active"), true);
   }, results);
 
   await runTest("gateway_formats_dash_response_with_combat_state", async () => {
@@ -2419,7 +2428,7 @@ async function runGatewayRuntimeIntegrationTests() {
     assert.equal(out.ok, true);
     assert.equal(interaction._replyCalls.length, 1);
     assert.equal(interaction._replyCalls[0].embeds[0].data.title, "Dash Taken");
-    assert.equal(interaction._replyCalls[0].embeds[1].data.title, "Combat State");
+    assert.equal(interaction._replyCalls[0].embeds[1].data.title, "Battle Window");
     assert.equal(String(interaction._replyCalls[0].content).includes("Movement: 5 -> 35"), true);
   }, results);
 
@@ -2476,7 +2485,7 @@ async function runGatewayRuntimeIntegrationTests() {
     assert.equal(out.ok, true);
     assert.equal(interaction._replyCalls.length, 1);
     assert.equal(interaction._replyCalls[0].embeds[0].data.title, "Assist Used");
-    assert.equal(interaction._replyCalls[0].embeds[1].data.title, "Combat State");
+    assert.equal(interaction._replyCalls[0].embeds[1].data.title, "Battle Window");
     assert.equal(String(interaction._replyCalls[0].content).includes("Effect: helped_attack applied"), true);
   }, results);
 
@@ -2534,7 +2543,7 @@ async function runGatewayRuntimeIntegrationTests() {
     assert.equal(out.ok, true);
     assert.equal(interaction._replyCalls.length, 1);
     assert.equal(interaction._replyCalls[0].embeds[0].data.title, "Ready Set");
-    assert.equal(interaction._replyCalls[0].embeds[1].data.title, "Combat State");
+    assert.equal(interaction._replyCalls[0].embeds[1].data.title, "Battle Window");
     assert.equal(String(interaction._replyCalls[0].content).includes("Readied Action: attack"), true);
   }, results);
 
@@ -2586,7 +2595,7 @@ async function runGatewayRuntimeIntegrationTests() {
     assert.equal(out.ok, true);
     assert.equal(interaction._replyCalls.length, 1);
     assert.equal(interaction._replyCalls[0].embeds[0].data.title, "Disengage Taken");
-    assert.equal(interaction._replyCalls[0].embeds[1].data.title, "Combat State");
+    assert.equal(interaction._replyCalls[0].embeds[1].data.title, "Battle Window");
     assert.equal(String(interaction._replyCalls[0].content).includes("Status: Disengaged"), true);
   }, results);
 
@@ -2656,11 +2665,11 @@ async function runGatewayRuntimeIntegrationTests() {
     assert.equal(out.ok, true);
     assert.equal(interaction._replyCalls.length, 1);
     assert.equal(interaction._replyCalls[0].embeds[0].data.title, "Spell Cast");
-    assert.equal(interaction._replyCalls[0].embeds[1].data.title, "Combat State");
-    assert.equal(String(interaction._replyCalls[0].embeds[0].data.description).includes("Result: Effect applied"), true);
-    assert.equal(String(interaction._replyCalls[0].embeds[0].data.description).includes("Round: 3"), true);
-    assert.equal(interaction._replyCalls[0].content.includes("Defense: 11 -> 16"), true);
-    assert.equal(interaction._replyCalls[0].content.includes("Conditions: mage_armor"), true);
+    assert.equal(interaction._replyCalls[0].embeds[1].data.title, "Battle Window");
+    assert.equal(String(interaction._replyCalls[0].embeds[0].data.fields[0].value).includes("Result: Effect applied"), true);
+    assert.equal(String(interaction._replyCalls[0].embeds[0].data.fields[2].value).includes("Round: 3"), true);
+    assert.equal(interaction._replyCalls[0].content.includes("Defense: AC 11 -> 16"), true);
+    assert.equal(interaction._replyCalls[0].content.includes("Conditions Gained: Mage Armor"), true);
   }, results);
 
   await runTest("gateway_formats_combat_status_command_and_refresh_button", async () => {
@@ -2685,11 +2694,30 @@ async function runGatewayRuntimeIntegrationTests() {
                       status: "active",
                       round: 4,
                       active_participant_id: "hero-001",
+                      turn_index: 0,
                       condition_count: 1,
+                      initiative_order: ["hero-001", "monster-001"],
+                      recent_events: [
+                        {
+                          event_type: "attack_action",
+                          attacker_id: "hero-001",
+                          target_id: "monster-001",
+                          hit: true,
+                          damage_dealt: 4
+                        },
+                        {
+                          event_type: "move_action",
+                          participant_id: "monster-001",
+                          from_position: { x: 2, y: 1 },
+                          to_position: { x: 3, y: 1 }
+                        }
+                      ],
                       participants: [
                         {
                           participant_id: "hero-001",
+                          name: "Aelar",
                           player_id: "player-gateway-combat-001",
+                          map_marker: "H1",
                           team: "heroes",
                           current_hp: 9,
                           max_hp: 12,
@@ -2698,10 +2726,16 @@ async function runGatewayRuntimeIntegrationTests() {
                           bonus_action_available: true,
                           reaction_available: true,
                           movement_remaining: 15,
+                          concentration: {
+                            is_concentrating: true,
+                            source_spell_id: "shield_of_faith"
+                          },
                           conditions: []
                         },
                         {
                           participant_id: "monster-001",
+                          name: "Goblin 1",
+                          map_marker: "M1",
                           team: "monsters",
                           current_hp: 3,
                           max_hp: 7,
@@ -2731,19 +2765,40 @@ async function runGatewayRuntimeIntegrationTests() {
     const out = await handleGatewayInteraction(interaction, runtime);
     assert.equal(out.ok, true);
     assert.equal(interaction._replyCalls.length, 1);
-    assert.equal(interaction._replyCalls[0].embeds[0].data.title, "Combat State");
+    assert.equal(interaction._replyCalls[0].embeds[0].data.title, "Battle Window");
     assert.equal(interaction._replyCalls[0].components.length >= 2, true);
     assert.equal(Array.isArray(interaction._replyCalls[0].files), true);
     assert.equal(interaction._replyCalls[0].files.length >= 1, true);
-    assert.equal(String(interaction._replyCalls[0].embeds[0].data.fields[0].value).includes("Resources: Action spent | Bonus up | Reaction up | Move 15"), true);
-    assert.equal(String(interaction._replyCalls[0].embeds[0].data.fields[1].value).includes("monster-001 3/7 HP | Cond Poisoned"), true);
+    assert.equal(String(interaction._replyCalls[0].content).includes("Map legend: gold ring = active turn"), true);
+    assert.equal(String(interaction._replyCalls[0].embeds[0].data.fields[0].value).includes("Actor: [H1] Aelar"), true);
+    assert.equal(String(interaction._replyCalls[0].embeds[0].data.fields[0].value).includes("HP: 9/12"), true);
+    assert.equal(String(interaction._replyCalls[0].embeds[0].data.fields[0].value).includes("Grid: (1, 1)"), true);
+    assert.equal(String(interaction._replyCalls[0].embeds[0].data.fields[0].value).includes("Conditions: Concentrating (Shield Of Faith)"), true);
+    assert.equal(String(interaction._replyCalls[0].embeds[0].data.fields[0].value).includes("Economy: Action spent | Bonus ready | Reaction ready | Move 15 ft"), true);
+    assert.equal(String(interaction._replyCalls[0].embeds[0].data.fields[1].value).includes("1. [H1] Aelar <- active"), true);
+    assert.equal(String(interaction._replyCalls[0].embeds[0].data.fields[1].value).includes("2. [M1] Goblin 1"), true);
+    assert.equal(String(interaction._replyCalls[0].embeds[0].data.fields[2].value).includes("[M1] Goblin 1 | HP 3/7 | Grid (3, 1) | Conditions Poisoned"), true);
+    assert.equal(
+      interaction._replyCalls[0].embeds[0].data.fields.some((field) => (
+        String(field.name).startsWith("Recent Flow") &&
+        String(field.value).includes("Aelar -> Goblin 1 hit 4") &&
+        String(field.value).includes("Goblin 1 moved 2,1 -> 3,1")
+      )),
+      true
+    );
+    assert.equal(
+      interaction._replyCalls[0].components.some((row) =>
+        Array.isArray(row.components) && row.components.some((button) => String(button.data.label) === "Terrain")
+      ),
+      true
+    );
 
     const button = createButtonInteraction("combat:view:refresh:combat-gateway-status-001", "player-gateway-combat-001");
     const buttonOut = await handleGatewayInteraction(button, runtime);
     assert.equal(buttonOut.ok, true);
     assert.equal(calls, 2);
     assert.equal(button._updateCalls.length, 1);
-    assert.equal(button._updateCalls[0].embeds[0].data.title, "Combat State");
+    assert.equal(button._updateCalls[0].embeds[0].data.title, "Battle Window");
     assert.equal(Array.isArray(button._updateCalls[0].files), true);
     assert.equal(button._updateCalls[0].files.length >= 1, true);
   }, results);
@@ -2814,6 +2869,69 @@ async function runGatewayRuntimeIntegrationTests() {
     assert.equal(receivedEvents[0].event_type, "player_dodge");
     assert.equal(receivedEvents[1].event_type, "player_dash");
     assert.equal(receivedEvents[2].event_type, "player_disengage");
+  }, results);
+
+  await runTest("gateway_chunks_battle_window_fields_for_large_combats", async () => {
+    const participants = Array.from({ length: 24 }, (_, index) => ({
+      participant_id: `combatant-${String(index + 1).padStart(2, "0")}-of-the-ruby-vanguard`,
+      map_marker: index < 7 ? `H${index + 1}` : `M${index - 6}`,
+      team: index < 7 ? "heroes" : "monsters",
+      current_hp: 10 - (index % 3),
+      max_hp: 12,
+      position: { x: index % 6, y: Math.floor(index / 2) },
+      action_available: index % 2 === 0,
+      bonus_action_available: true,
+      reaction_available: index % 3 !== 0,
+      movement_remaining: 30 - ((index % 4) * 5),
+      conditions: index % 4 === 0 ? ["poisoned", "restrained"] : []
+    }));
+
+    const runtime = {
+      processGatewayReadCommandEvent(event) {
+        return {
+          ok: true,
+          event_type: "read_command_runtime_completed",
+          payload: {
+            responses: [
+              {
+                event_type: "gateway_response_ready",
+                payload: {
+                  response_type: "combat",
+                  ok: true,
+                  data: {
+                    combat_id: "combat-gateway-large-001",
+                    combat_summary: {
+                      combat_id: "combat-gateway-large-001",
+                      status: "active",
+                      round: 8,
+                      active_participant_id: "combatant-01-of-the-ruby-vanguard",
+                      initiative_order: participants.map((entry) => entry.participant_id),
+                      participants
+                    }
+                  },
+                  error: null
+                }
+              }
+            ],
+            events_processed: [event],
+            final_state: {}
+          },
+          error: null
+        };
+      }
+    };
+
+    const interaction = createInteraction("combat", [], "player-gateway-combat-001");
+    const out = await handleGatewayInteraction(interaction, runtime);
+
+    assert.equal(out.ok, true);
+    assert.equal(interaction._replyCalls.length, 1);
+    assert.equal(interaction._replyCalls[0].embeds[0].data.title, "Battle Window");
+    assert.equal(interaction._replyCalls[0].embeds[0].data.fields.length > 3, true);
+    assert.equal(
+      interaction._replyCalls[0].embeds[0].data.fields.some((field) => String(field.name).startsWith("Battlefield")),
+      true
+    );
   }, results);
 
   await runTest("gateway_handles_map_ui_move_preview_without_putting_gameplay_logic_in_gateway", async () => {
@@ -2901,10 +3019,17 @@ async function runGatewayRuntimeIntegrationTests() {
 
     assert.equal(out.ok, true);
     assert.equal(interaction._updateCalls.length, 1);
-      assert.equal(String(interaction._updateCalls[0].content).includes("Move Preview"), true);
-      assert.equal(Array.isArray(interaction._updateCalls[0].files), true);
-      assert.equal(interaction._updateCalls[0].files.length >= 1, true);
-    }, results);
+    assert.equal(String(interaction._updateCalls[0].content).includes("Move Preview"), true);
+    assert.equal(Array.isArray(interaction._updateCalls[0].files), true);
+    assert.equal(interaction._updateCalls[0].files.length >= 1, true);
+    assert.equal(
+      interaction._updateCalls[0].components.some((row) =>
+        Array.isArray(row.components) &&
+        row.components.some((button) => String(button.data.label).includes("(5ft)"))
+      ),
+      true
+    );
+  }, results);
 
   await runTest("gateway_handles_map_ui_spell_selection_with_supported_spell_slice", async () => {
     const runtime = {
@@ -2948,6 +3073,7 @@ async function runGatewayRuntimeIntegrationTests() {
                       participants: [
                         {
                           participant_id: "hero-001",
+                          name: "Aelar",
                           player_id: "player-gateway-map-ui-spell-001",
                           known_spell_ids: ["fire_bolt", "bless"],
                           team: "heroes",
@@ -2962,6 +3088,7 @@ async function runGatewayRuntimeIntegrationTests() {
                         },
                         {
                           participant_id: "monster-001",
+                          name: "Goblin 1",
                           team: "monsters",
                           current_hp: 8,
                           max_hp: 8,
@@ -2991,7 +3118,6 @@ async function runGatewayRuntimeIntegrationTests() {
     const listOut = await handleGatewayInteraction(listInteraction, runtime);
     assert.equal(listOut.ok, true);
     assert.equal(String(listInteraction._updateCalls[0].content).includes("Choose a spell"), true);
-    assert.equal(String(listInteraction._updateCalls[0].content).includes("Bless"), true);
     assert.equal(
       listInteraction._updateCalls[0].components.some((row) =>
         Array.isArray(row.components) && row.components.some((button) => String(button.data.label) === "Fire Bolt")
@@ -3002,7 +3128,7 @@ async function runGatewayRuntimeIntegrationTests() {
       listInteraction._updateCalls[0].components.some((row) =>
         Array.isArray(row.components) && row.components.some((button) => String(button.data.label) === "Bless")
       ),
-      false
+      true
     );
 
     const previewInteraction = createButtonInteraction("map-ui:spell,fire_bolt:combat:combat-gateway-map-ui-spell-001:hero-001", "player-gateway-map-ui-spell-001");
@@ -3010,6 +3136,12 @@ async function runGatewayRuntimeIntegrationTests() {
     assert.equal(previewOut.ok, true);
     assert.equal(String(previewInteraction._updateCalls[0].content).includes("Spell Preview"), true);
     assert.equal(String(previewInteraction._updateCalls[0].content).includes("Fire Bolt"), true);
+    assert.equal(
+      previewInteraction._updateCalls[0].components.some((row) =>
+        Array.isArray(row.components) && row.components.some((button) => String(button.data.label) === "Goblin 1")
+      ),
+      true
+    );
     assert.equal(Array.isArray(previewInteraction._updateCalls[0].files), true);
     assert.equal(previewInteraction._updateCalls[0].files.length >= 1, true);
   }, results);
@@ -3030,12 +3162,20 @@ async function runGatewayRuntimeIntegrationTests() {
             targeting: { type: "single_target" }
           },
           {
+            spell_id: "shatter",
+            name: "Shatter",
+            level: 2,
+            casting_time: "1 action",
+            range: "60 feet",
+            targeting: { type: "sphere_10ft" }
+          },
+          {
             spell_id: "thunderwave",
             name: "Thunderwave",
             level: 1,
             casting_time: "1 action",
             range: "self",
-            targeting: { type: "cube_15" }
+            targeting: { type: "cube_15ft" }
           },
           {
             spell_id: "bless",
@@ -3055,8 +3195,9 @@ async function runGatewayRuntimeIntegrationTests() {
           participants: [
             {
               participant_id: "hero-001",
+              name: "Aelar",
               player_id: "player-gateway-live-flow-001",
-              known_spell_ids: ["fire_bolt", "thunderwave", "bless"],
+              known_spell_ids: ["fire_bolt", "shatter", "thunderwave", "bless"],
               team: "heroes",
               current_hp: 14,
               max_hp: 14,
@@ -3074,6 +3215,7 @@ async function runGatewayRuntimeIntegrationTests() {
             },
             {
               participant_id: "monster-001",
+              name: "Goblin 1",
               team: "monsters",
               current_hp: 12,
               max_hp: 12,
@@ -3120,7 +3262,7 @@ async function runGatewayRuntimeIntegrationTests() {
     const combatOut = await handleGatewayInteraction(combatInteraction, runtime);
     assert.equal(combatOut.ok, true);
     assert.equal(combatInteraction._replyCalls.length, 1);
-    assert.equal(combatInteraction._replyCalls[0].embeds[0].data.title, "Combat State");
+    assert.equal(combatInteraction._replyCalls[0].embeds[0].data.title, "Battle Window");
     assert.equal(Array.isArray(combatInteraction._replyCalls[0].files), true);
     assert.equal(combatInteraction._replyCalls[0].files.length >= 1, true);
     assert.equal(
@@ -3137,6 +3279,26 @@ async function runGatewayRuntimeIntegrationTests() {
     assert.equal(String(moveInteraction._updateCalls[0].content).includes("Move Preview"), true);
     assert.equal(Array.isArray(moveInteraction._updateCalls[0].files), true);
     assert.equal(moveInteraction._updateCalls[0].files.length >= 1, true);
+    assert.equal(
+      moveInteraction._updateCalls[0].components.some((row) =>
+        Array.isArray(row.components) && row.components.some((button) => String(button.data.label).includes("(5ft)"))
+      ),
+      true
+    );
+
+    const moveTargetInteraction = createButtonInteraction("map-ui:move_target,1,0:combat:combat-gateway-live-flow-001:hero-001", "player-gateway-live-flow-001");
+    const moveTargetOut = await handleGatewayInteraction(moveTargetInteraction, runtime);
+    assert.equal(moveTargetOut.ok, true);
+    assert.equal(String(moveTargetInteraction._updateCalls[0].content).includes("Selected: 1,0"), true);
+    assert.equal(Array.isArray(moveTargetInteraction._updateCalls[0].files), true);
+    assert.equal(moveTargetInteraction._updateCalls[0].files.length >= 1, true);
+
+    const moveConfirmInteraction = createButtonInteraction("map-ui:move_confirm:combat:combat-gateway-live-flow-001:hero-001", "player-gateway-live-flow-001");
+    const moveConfirmOut = await handleGatewayInteraction(moveConfirmInteraction, runtime);
+    assert.equal(moveConfirmOut.ok, true);
+    assert.equal(moveConfirmInteraction._updateCalls.length, 1);
+    assert.equal(moveConfirmInteraction._updateCalls[0].embeds[0].data.title, "Battle Window");
+    assert.equal(receivedEvents.some((event) => event && event.event_type === "player_move"), true);
 
     const attackInteraction = createButtonInteraction("map-ui:attack:combat:combat-gateway-live-flow-001:hero-001", "player-gateway-live-flow-001");
     const attackOut = await handleGatewayInteraction(attackInteraction, runtime);
@@ -3144,7 +3306,7 @@ async function runGatewayRuntimeIntegrationTests() {
     assert.equal(String(attackInteraction._updateCalls[0].content).includes("Attack Preview"), true);
     assert.equal(
       attackInteraction._updateCalls[0].components.some((row) =>
-        Array.isArray(row.components) && row.components.some((button) => String(button.data.label) === "monster-001")
+        Array.isArray(row.components) && row.components.some((button) => String(button.data.label) === "Goblin 1")
       ),
       true
     );
@@ -3153,13 +3315,13 @@ async function runGatewayRuntimeIntegrationTests() {
     const attackTargetOut = await handleGatewayInteraction(attackTargetInteraction, runtime);
     assert.equal(attackTargetOut.ok, true);
     assert.equal(String(attackTargetInteraction._updateCalls[0].content).includes("Attack Preview"), true);
-    assert.equal(String(attackTargetInteraction._updateCalls[0].content).includes("monster-001"), true);
+    assert.equal(String(attackTargetInteraction._updateCalls[0].content).includes("Goblin 1"), true);
 
     const attackConfirmInteraction = createButtonInteraction("map-ui:attack_confirm:combat:combat-gateway-live-flow-001:hero-001", "player-gateway-live-flow-001");
     const attackConfirmOut = await handleGatewayInteraction(attackConfirmInteraction, runtime);
     assert.equal(attackConfirmOut.ok, true);
     assert.equal(attackConfirmInteraction._updateCalls.length, 1);
-    assert.equal(attackConfirmInteraction._updateCalls[0].embeds[0].data.title, "Combat State");
+    assert.equal(attackConfirmInteraction._updateCalls[0].embeds[0].data.title, "Battle Window");
     assert.equal(Array.isArray(attackConfirmInteraction._updateCalls[0].files), true);
     assert.equal(attackConfirmInteraction._updateCalls[0].files.length >= 1, true);
     assert.equal(receivedEvents.some((event) => event && event.event_type === "player_attack"), true);
@@ -3178,13 +3340,19 @@ async function runGatewayRuntimeIntegrationTests() {
       spellListInteraction._updateCalls[0].components.some((row) =>
         Array.isArray(row.components) && row.components.some((button) => String(button.data.label) === "Bless")
       ),
-      false
+      true
+    );
+    assert.equal(
+      spellListInteraction._updateCalls[0].components.some((row) =>
+        Array.isArray(row.components) && row.components.some((button) => String(button.data.label) === "Shatter")
+      ),
+      true
     );
     assert.equal(
       spellListInteraction._updateCalls[0].components.some((row) =>
         Array.isArray(row.components) && row.components.some((button) => String(button.data.label) === "Thunderwave")
       ),
-      false
+      true
     );
 
     const spellPreviewInteraction = createButtonInteraction("map-ui:spell,fire_bolt:combat:combat-gateway-live-flow-001:hero-001", "player-gateway-live-flow-001");
@@ -3194,6 +3362,252 @@ async function runGatewayRuntimeIntegrationTests() {
     assert.equal(String(spellPreviewInteraction._updateCalls[0].content).includes("Fire Bolt"), true);
     assert.equal(Array.isArray(spellPreviewInteraction._updateCalls[0].files), true);
     assert.equal(spellPreviewInteraction._updateCalls[0].files.length >= 1, true);
+
+    const shatterPreviewInteraction = createButtonInteraction("map-ui:spell,shatter:combat:combat-gateway-live-flow-001:hero-001", "player-gateway-live-flow-001");
+    const shatterPreviewOut = await handleGatewayInteraction(shatterPreviewInteraction, runtime);
+    assert.equal(shatterPreviewOut.ok, true);
+    assert.equal(String(shatterPreviewInteraction._updateCalls[0].content).includes("Spell Preview"), true);
+    assert.equal(String(shatterPreviewInteraction._updateCalls[0].content).includes("Blue tiles = spell range"), true);
+    assert.equal(Array.isArray(shatterPreviewInteraction._updateCalls[0].files), true);
+    assert.equal(shatterPreviewInteraction._updateCalls[0].files.length >= 1, true);
+
+    const shatterTileInteraction = createButtonInteraction("map-ui:spell_target_tile,shatter,3,2:combat:combat-gateway-live-flow-001:hero-001", "player-gateway-live-flow-001");
+    const shatterTileOut = await handleGatewayInteraction(shatterTileInteraction, runtime);
+    assert.equal(shatterTileOut.ok, true);
+    assert.equal(String(shatterTileInteraction._updateCalls[0].content).includes("Affected units: Goblin 1"), true);
+    assert.equal(Array.isArray(shatterTileInteraction._updateCalls[0].files), true);
+    assert.equal(shatterTileInteraction._updateCalls[0].files.length >= 1, true);
+  }, results);
+
+  await runTest("gateway_updates_board_before_sending_text_only_turn_summary_for_resolved_map_actions", async () => {
+    function buildCombatSummary() {
+      return {
+        combat_id: "combat-gateway-followup-001",
+        status: "active",
+        round: 3,
+        active_participant_id: "hero-001",
+        condition_count: 0,
+        participants: [
+          {
+            participant_id: "hero-001",
+            name: "Aelar",
+            player_id: "player-gateway-followup-001",
+            team: "heroes",
+            current_hp: 10,
+            max_hp: 12,
+            position: { x: 1, y: 1 },
+            action_available: true,
+            bonus_action_available: true,
+            reaction_available: true,
+            movement_remaining: 30,
+            conditions: [],
+            weapon_profile: {
+              weapon_name: "Longsword",
+              mode: "melee",
+              range_feet: 5
+            }
+          },
+          {
+            participant_id: "monster-001",
+            name: "Goblin 1",
+            team: "monsters",
+            current_hp: 7,
+            max_hp: 7,
+            position: { x: 2, y: 1 },
+            action_available: true,
+            bonus_action_available: true,
+            reaction_available: true,
+            movement_remaining: 30,
+            conditions: []
+          }
+        ]
+      };
+    }
+
+    const runtime = {
+      processGatewayReadCommandEvent(event) {
+        if (event && event.event_type === "player_attack") {
+          const summary = buildCombatSummary();
+          summary.active_participant_id = "monster-001";
+          summary.participants[1].current_hp = 3;
+          summary.participants[0].action_available = false;
+          return {
+            ok: true,
+            event_type: "read_command_runtime_completed",
+            payload: {
+              responses: [
+                {
+                  event_type: "gateway_response_ready",
+                  payload: {
+                    response_type: "attack",
+                    ok: true,
+                    data: {
+                      attack_status: "resolved",
+                      combat_id: "combat-gateway-followup-001",
+                      attacker_id: "hero-001",
+                      target_id: "monster-001",
+                      hit: true,
+                      damage_type: "slashing",
+                      damage_dealt: 4,
+                      damage_result: {
+                        final_damage: 4,
+                        damage_type: "slashing",
+                        hp_before: 7,
+                        hp_after: 3
+                      },
+                      active_participant_id: "monster-001",
+                      combat_completed: false,
+                      combat_summary: summary,
+                      ai_turns: []
+                    },
+                    error: null
+                  }
+                }
+              ],
+              events_processed: [event],
+              final_state: {}
+            },
+            error: null
+          };
+        }
+
+        return {
+          ok: true,
+          event_type: "read_command_runtime_completed",
+          payload: {
+            responses: [
+              {
+                event_type: "gateway_response_ready",
+                payload: {
+                  response_type: "combat",
+                  ok: true,
+                  data: {
+                    combat_id: "combat-gateway-followup-001",
+                    combat_summary: buildCombatSummary()
+                  },
+                  error: null
+                }
+              }
+            ],
+            events_processed: [event],
+            final_state: {}
+          },
+          error: null
+        };
+      }
+    };
+
+    const openInteraction = createInteraction("combat", [], "player-gateway-followup-001");
+    const openOut = await handleGatewayInteraction(openInteraction, runtime);
+    assert.equal(openOut.ok, true);
+    assert.equal(openInteraction._replyCalls.length, 1);
+
+    const attackOpenInteraction = createButtonInteraction("map-ui:attack:combat:combat-gateway-followup-001:hero-001", "player-gateway-followup-001");
+    const attackOpenOut = await handleGatewayInteraction(attackOpenInteraction, runtime);
+    assert.equal(attackOpenOut.ok, true);
+
+    const attackTargetInteraction = createButtonInteraction("map-ui:attack_target,monster-001:combat:combat-gateway-followup-001:hero-001", "player-gateway-followup-001");
+    const attackTargetOut = await handleGatewayInteraction(attackTargetInteraction, runtime);
+    assert.equal(attackTargetOut.ok, true);
+
+    const confirmInteraction = createButtonInteraction("map-ui:attack_confirm:combat:combat-gateway-followup-001:hero-001", "player-gateway-followup-001");
+    const callOrder = [];
+    const originalUpdate = confirmInteraction.update.bind(confirmInteraction);
+    const originalFollowUp = confirmInteraction.followUp.bind(confirmInteraction);
+    confirmInteraction.update = async (payload) => {
+      callOrder.push("update");
+      await originalUpdate(payload);
+    };
+    confirmInteraction.followUp = async (payload) => {
+      callOrder.push("followUp");
+      await originalFollowUp(payload);
+    };
+
+    const confirmOut = await handleGatewayInteraction(confirmInteraction, runtime);
+    assert.equal(confirmOut.ok, true);
+    assert.deepEqual(callOrder, ["update", "followUp"]);
+    assert.equal(confirmInteraction._updateCalls.length, 1);
+    assert.equal(confirmInteraction._updateCalls[0].embeds[0].data.title, "Battle Window");
+    assert.equal(String(confirmInteraction._updateCalls[0].content).includes("Map legend: gold ring = active turn"), true);
+    assert.equal(Array.isArray(confirmInteraction._updateCalls[0].files), true);
+    assert.equal(confirmInteraction._updateCalls[0].files.length >= 1, true);
+    assert.equal(confirmInteraction._followUpCalls.length, 1);
+    assert.equal(String(confirmInteraction._followUpCalls[0].content).includes("Action:"), true);
+    assert.equal(String(confirmInteraction._followUpCalls[0].content).includes("Target: Goblin 1"), true);
+    assert.equal(String(confirmInteraction._followUpCalls[0].content).includes("Next Turn: Goblin 1 | HP 3/7"), true);
+    assert.deepEqual(confirmInteraction._followUpCalls[0].allowedMentions, { parse: [] });
+    assert.equal(confirmInteraction._followUpCalls[0].ephemeral, true);
+  }, results);
+
+  await runTest("gateway_token_visual_overrides_do_not_freeze_active_turn_borders", async () => {
+    const mapConfig = {
+      map_path: path.resolve(process.cwd(), "apps/map-system/data/maps/combat/map-12x12.base-map.json"),
+      profile_path: ""
+    };
+    const activeMonsterSummary = {
+      combat_id: "combat-gateway-border-sync-001",
+      status: "active",
+      round: 2,
+      active_participant_id: "monster-001",
+      participants: [
+        {
+          participant_id: "hero-001",
+          name: "Aelar",
+          player_id: "player-gateway-border-sync-001",
+          team: "heroes",
+          current_hp: 14,
+          max_hp: 14,
+          position: { x: 1, y: 1 },
+          conditions: []
+        },
+        {
+          participant_id: "monster-001",
+          name: "Goblin 1",
+          team: "monsters",
+          current_hp: 7,
+          max_hp: 7,
+          position: { x: 2, y: 1 },
+          conditions: []
+        }
+      ]
+    };
+
+    const firstState = buildCombatMapState({
+      combat_summary: activeMonsterSummary,
+      map_config: mapConfig,
+      token_overrides: [
+        {
+          token_id: "hero-001",
+          asset_path: "apps/map-system/assets/tokens/players/processed/male-tiefling-03.cleaned.png",
+          color: "#123456",
+          shape: "square"
+        }
+      ],
+      user_id: "player-gateway-border-sync-001"
+    });
+    assert.equal(firstState.ok, true);
+
+    const cachedOverrides = buildTokenVisualOverrides(firstState.payload.map.tokens);
+    const nextTurnSummary = Object.assign({}, activeMonsterSummary, {
+      round: 3,
+      active_participant_id: "hero-001"
+    });
+    const secondState = buildCombatMapState({
+      combat_summary: nextTurnSummary,
+      map_config: mapConfig,
+      token_overrides: cachedOverrides,
+      user_id: "player-gateway-border-sync-001"
+    });
+    assert.equal(secondState.ok, true);
+
+    const hero = secondState.payload.map.tokens.find((token) => token.token_id === "hero-001");
+    const monster = secondState.payload.map.tokens.find((token) => token.token_id === "monster-001");
+    assert.equal(hero.asset_path, "apps/map-system/assets/tokens/players/processed/male-tiefling-03.cleaned.png");
+    assert.equal(hero.color, "#123456");
+    assert.equal(hero.shape, "square");
+    assert.equal(hero.border_color, "#ffd166");
+    assert.equal(monster.border_color, null);
+    assert.equal(monster.image_border_color, null);
   }, results);
 
   await runTest("gateway_uses_runtime_failure_response_shape_for_replies", async () => {

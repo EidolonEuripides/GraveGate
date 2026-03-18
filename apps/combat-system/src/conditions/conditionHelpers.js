@@ -151,8 +151,17 @@ function findParticipantById(combatState, participantId) {
 }
 
 function participantIsIncapacitated(combatState, participantId) {
-  return participantHasCondition(combatState, participantId, "stunned") ||
-    participantHasCondition(combatState, participantId, "paralyzed");
+  return Boolean(getParticipantIncapacitationType(combatState, participantId));
+}
+
+function getParticipantIncapacitationType(combatState, participantId) {
+  if (participantHasCondition(combatState, participantId, "stunned")) {
+    return "stunned";
+  }
+  if (participantHasCondition(combatState, participantId, "paralyzed")) {
+    return "paralyzed";
+  }
+  return null;
 }
 
 function normalizeCombatControlConditions(combatState) {
@@ -209,6 +218,7 @@ module.exports = {
   removeConditionFromCombatState,
   expireConditionsForTrigger,
   getActiveConditionsForParticipant,
+  getParticipantIncapacitationType,
   participantHasCondition,
   normalizeCombatControlConditions
 };

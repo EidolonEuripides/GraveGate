@@ -7,6 +7,7 @@ const {
 } = require("./actionEconomy");
 const {
   applyConditionToCombatState,
+  getParticipantIncapacitationType,
   getActiveConditionsForParticipant,
   removeConditionFromCombatState
 } = require("../conditions/conditionHelpers");
@@ -126,6 +127,14 @@ function performHelpAction(input) {
       combat_id: String(combatId),
       helper_id: String(helperId),
       current_hp: Number(helper.current_hp || 0)
+    });
+  }
+  const incapacitationType = getParticipantIncapacitationType(combat, helperId);
+  if (incapacitationType) {
+    return failure("help_action_failed", `${incapacitationType} participants cannot act`, {
+      combat_id: String(combatId),
+      helper_id: String(helperId),
+      incapacitating_condition: incapacitationType
     });
   }
   if (Number(target.current_hp || 0) <= 0) {
