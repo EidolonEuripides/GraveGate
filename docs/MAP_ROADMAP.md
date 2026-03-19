@@ -29,8 +29,7 @@ Scope:
 - Edge walls, cover, terrain masks, PNG output, and event adapters are in
 - Live gateway dry-run flow exists
 - Button-driven preview/confirm flow is in for move, attack, and supported spells
-- Battle-window + map flow is working, but action-result presentation is still inconsistent across some combat actions
-- Authored validation/control profiles now exist for the clean 12x10 combat map
+- Battle-window + map flow is working, and combat action replies now use one structured result-feed path
 
 ### Dungeon maps
 - Dungeon map attachments are working
@@ -53,7 +52,6 @@ Scope:
   - terrain
   - coords
 - Exit overlays and route summaries now stay aligned when exit position comes from compiled/map-side data
-- Authored validation/control profiles now exist for the clean 12x10 dungeon map
 
 ## Immediate Map-Team Priorities
 
@@ -68,7 +66,7 @@ Scope:
   - edge walls
   - terrain blockers
   - dungeon markers
-- Expand the new validation/control profiles so a new map can be checked before content use
+- Restore clean validation/control profiles so a new map can be checked before content use
 
 ### 3. Combat-map UX polish
 - Improve selected target markers
@@ -78,7 +76,7 @@ Scope:
 - Keep the battle-window/text-summary split coherent across all supported combat action types
 
 ### 4. Dungeon-map authoring validation
-- Add or refine control maps for:
+- Add or restore control maps for:
   - exits
   - markers
   - edge walls

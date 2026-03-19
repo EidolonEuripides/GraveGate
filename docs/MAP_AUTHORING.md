@@ -104,18 +104,19 @@ This keeps the architecture safe:
 6. Produce structured map/profile data.
 7. Use that compiled data for rendering and authoritative session/combat-driven display.
 
-## Validation Control Profiles
+## Validation Control Workflow
 
 Before debugging prettier authored maps, validate behavior on clean control maps first.
 
-Current control-profile starting points:
-- `apps/map-system/data/profiles/combat/map-12x10.validation-control.json`
-  - terrain semantics sanity checks
-  - hazard/difficult-terrain validation
-  - edge-wall regression checks on a clean combat map
-- `apps/map-system/data/profiles/dungeon/map-12x10.validation-control.json`
-  - exit/object/trap/encounter marker-style validation
-  - dungeon overlay/debug-label validation on a clean dungeon map
+Recommended control-profile pattern:
+- keep one clean combat validation profile and one clean dungeon validation profile for the shared 12x10 test maps
+- use them for terrain semantics sanity checks
+- use them for hazard/difficult-terrain and edge-wall regression checks
+- use them for dungeon marker, overlay, and debug-label validation
+
+Current status:
+- this workflow is the recommended direction for map validation
+- the clean control-profile artifacts still need to be restored onto `main` before the file paths can be treated as canonical references
 
 Practical use:
 - layer the validation profile on top of the compiled base profile for the same map
