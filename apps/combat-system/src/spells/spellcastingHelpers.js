@@ -377,12 +377,13 @@ function validateSpellTargeting(spell, caster, target) {
       };
     }
   } else if (AREA_TEMPLATE_TARGET_TYPES.has(targetType)) {
-    if (!target) {
-      return {
-        ok: false,
-        error: "spell requires valid area targets"
-      };
-    }
+    return {
+      ok: true,
+      payload: {
+        target_type: targetType
+      },
+      error: null
+    };
   } else if (!target) {
     return {
       ok: false,

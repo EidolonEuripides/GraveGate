@@ -20,6 +20,7 @@ const {
   getParticipantAbilityModifier,
   parseSpellRangeFeet,
   getSpellTargetType,
+  getSpellAreaTemplate,
   resolveSpellActionCost,
   isCantripSpell,
   validateSpellKnown,
@@ -230,6 +231,11 @@ function validateSpellRange(caster, target, spell) {
   });
 }
 
+function positionsMatch(left, right) {
+  return Number(left && left.x) === Number(right && right.x) &&
+    Number(left && left.y) === Number(right && right.y);
+}
+
 function normalizeTargetParticipantId(casterId, spell, requestedTargetId) {
   const targetType = getSpellTargetType(spell);
   if (targetType === "self") {
@@ -252,6 +258,29 @@ function normalizeTargetParticipantIds(casterId, spell, requestedTargetId, reque
   }
   const fallbackTargetId = String(requestedTargetId || "").trim();
   return fallbackTargetId ? [fallbackTargetId] : [];
+}
+
+function dedupePositions(positions) {
+  const output = [];
+  const seen = new Set();
+  const safePositions = Array.isArray(positions) ? positions : [];
+  for (let index = 0; index < safePositions.length; index += 1) {
+    const entry = safePositions[index];
+    if (!entry || !Number.isFinite(Number(entry.x)) || !Number.isFinite(Number(entry.y))) {
+      continue;
+    }
+    const normalized = {
+      x: Math.floor(Number(entry.x)),
+      y: Math.floor(Number(entry.y))
+    };
+    const key = `${normalized.x},${normalized.y}`;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    output.push(normalized);
+  }
+  return output;
 }
 
 function isInsideBounds(position) {
@@ -449,9 +478,7 @@ function validateTargetSelectionCount(spell, targetIds) {
     "aura_15ft",
     "cylinder_20ft"
   ].includes(targetType)) {
-    return count >= 1
-      ? success("spell_target_count_valid", { target_count: count })
-      : failure("cast_spell_action_failed", "area spell requires at least one target");
+    return success("spell_target_count_valid", { target_count: count });
   }
   return count === 1
     ? success("spell_target_count_valid", { target_count: count })
@@ -501,16 +528,149 @@ function shouldRegisterPersistentSpellEffect(spell) {
 
 function normalizeAreaTiles(areaTiles) {
   const list = Array.isArray(areaTiles) ? areaTiles : [];
-  return list
-    .map((entry) => {
-      const x = Number(entry && entry.x);
-      const y = Number(entry && entry.y);
-      if (!Number.isFinite(x) || !Number.isFinite(y)) {
-        return null;
+  return dedupePositions(list);
+}
+
+function getAreaTemplateExtentFeet(template) {
+  if (!template || typeof template !== "object") {
+    return 0;
+  }
+  if (Number.isFinite(Number(template.radius_feet))) {
+    return Math.max(0, Number(template.radius_feet));
+  }
+  if (Number.isFinite(Number(template.length_feet))) {
+    return Math.max(0, Number(template.length_feet));
+  }
+  if (Number.isFinite(Number(template.size_feet))) {
+    return Math.max(0, Number(template.size_feet));
+  }
+  return 0;
+}
+
+function isAreaSpell(spell) {
+  return Boolean(getSpellAreaTemplate(spell));
+}
+
+function everyPositionWithinFeet(origin, positions, maxFeet) {
+  const safePositions = Array.isArray(positions) ? positions : [];
+  return safePositions.every((position) => {
+    return position &&
+      Number.isFinite(gridDistanceFeet(origin, position)) &&
+      gridDistanceFeet(origin, position) <= maxFeet;
+  });
+}
+
+function findAreaAnchorCandidate(caster, targets, areaTiles, spellRangeFeet, templateExtentFeet) {
+  const candidatePositions = dedupePositions(
+    []
+      .concat(Array.isArray(areaTiles) ? areaTiles : [])
+      .concat(
+        (Array.isArray(targets) ? targets : [])
+          .map((entry) => entry && entry.position ? entry.position : null)
+      )
+  );
+  for (let index = 0; index < candidatePositions.length; index += 1) {
+    const candidate = candidatePositions[index];
+    const candidateDistance = gridDistanceFeet(caster.position, candidate);
+    if (!Number.isFinite(candidateDistance) || candidateDistance > spellRangeFeet) {
+      continue;
+    }
+    if (!everyPositionWithinFeet(candidate, areaTiles, templateExtentFeet)) {
+      continue;
+    }
+    return candidate;
+  }
+  return null;
+}
+
+function validateAreaSpellSelection(caster, spell, targets, areaTiles) {
+  const template = getSpellAreaTemplate(spell);
+  if (!template) {
+    return success("spell_area_selection_valid", {
+      normalized_area_tiles: normalizeAreaTiles(areaTiles)
+    });
+  }
+
+  const normalizedAreaTiles = normalizeAreaTiles(areaTiles);
+  const safeTargets = Array.isArray(targets) ? targets.filter(Boolean) : [];
+  const hasAreaTiles = normalizedAreaTiles.length > 0;
+  const hasTargets = safeTargets.length > 0;
+  const requiresPersistentArea = shouldRegisterPersistentSpellEffect(spell);
+
+  if (!hasAreaTiles && !hasTargets) {
+    return failure("cast_spell_action_failed", "area spell requires explicit area tiles or valid targets");
+  }
+  if (requiresPersistentArea && !hasAreaTiles) {
+    return failure("cast_spell_action_failed", "persistent area spell requires explicit area tiles");
+  }
+  if (!caster || !caster.position) {
+    return failure("cast_spell_action_failed", "area spell caster position is required");
+  }
+  if (normalizedAreaTiles.some((tile) => !isInsideBounds(tile))) {
+    return failure("cast_spell_action_failed", "area spell tiles must stay within battlefield bounds", {
+      area_tiles: clone(normalizedAreaTiles)
+    });
+  }
+
+  const templateOrigin = String(template.origin || "").trim().toLowerCase();
+  const templateExtentFeet = getAreaTemplateExtentFeet(template);
+
+  if (templateOrigin === "self") {
+    if (template.shape === "aura" && hasAreaTiles && !normalizedAreaTiles.some((tile) => positionsMatch(tile, caster.position))) {
+      return failure("cast_spell_action_failed", "self-centered aura tiles must include the caster position", {
+        caster_position: clone(caster.position),
+        area_tiles: clone(normalizedAreaTiles)
+      });
+    }
+    if (hasAreaTiles && !everyPositionWithinFeet(caster.position, normalizedAreaTiles, templateExtentFeet)) {
+      return failure("cast_spell_action_failed", "area spell tiles are outside the self-origin template", {
+        caster_position: clone(caster.position),
+        area_tiles: clone(normalizedAreaTiles),
+        template: clone(template)
+      });
+    }
+    if (hasTargets) {
+      const targetPositions = safeTargets.map((entry) => entry.position).filter(Boolean);
+      if (!everyPositionWithinFeet(caster.position, targetPositions, templateExtentFeet)) {
+        return failure("cast_spell_action_failed", "area spell targets are outside the self-origin template", {
+          caster_position: clone(caster.position),
+          target_ids: safeTargets.map((entry) => String(entry.participant_id || "")),
+          template: clone(template)
+        });
       }
-      return { x: Math.floor(x), y: Math.floor(y) };
-    })
-    .filter(Boolean);
+    }
+    return success("spell_area_selection_valid", {
+      normalized_area_tiles: normalizedAreaTiles
+    });
+  }
+
+  if (templateOrigin === "point_within_range") {
+    const spellRangeFeet = parseSpellRangeFeet(spell && spell.range);
+    if (hasAreaTiles) {
+      const anchor = findAreaAnchorCandidate(caster, safeTargets, normalizedAreaTiles, spellRangeFeet, templateExtentFeet);
+      if (!anchor) {
+        return failure("cast_spell_action_failed", "area spell tiles are not valid for the spell range/template", {
+          caster_position: clone(caster.position),
+          area_tiles: clone(normalizedAreaTiles),
+          template: clone(template),
+          spell_range_feet: spellRangeFeet
+        });
+      }
+    } else {
+      const targetPositions = safeTargets.map((entry) => entry.position).filter(Boolean);
+      if (!everyPositionWithinFeet(caster.position, targetPositions, spellRangeFeet)) {
+        return failure("cast_spell_action_failed", "area spell targets are outside spell range", {
+          caster_position: clone(caster.position),
+          target_ids: safeTargets.map((entry) => String(entry.participant_id || "")),
+          spell_range_feet: spellRangeFeet
+        });
+      }
+    }
+  }
+
+  return success("spell_area_selection_valid", {
+    normalized_area_tiles: normalizedAreaTiles
+  });
 }
 
 function resolvePersistentZoneBehavior(spell, caster, targetIds) {
@@ -1967,6 +2127,7 @@ function performCastSpellAction(input) {
   const warCasterReaction = data.war_caster_reaction === true;
   const targetIds = normalizeTargetParticipantIds(casterId, spell, data.target_id, data.target_ids);
   const targetId = targetIds[0] || null;
+  const areaSpell = isAreaSpell(spell);
 
   if (!combatManager) {
     return failure("cast_spell_action_failed", "combatManager is required");
@@ -2077,11 +2238,23 @@ function performCastSpellAction(input) {
   }
   const targets = targetIds.map((entry) => findParticipantById(combat.participants || [], entry));
   const target = targets[0] || null;
-  if (targets.some((entry) => !entry)) {
+  const hasMissingSpecifiedTarget = targetIds.some((entry, index) => {
+    return String(entry || "").trim() && !targets[index];
+  });
+  if (hasMissingSpecifiedTarget) {
     return failure("cast_spell_action_failed", "spell requires valid targets", {
       target_ids: clone(targetIds)
     });
   }
+  const areaSelectionValidation = areaSpell
+    ? validateAreaSpellSelection(caster, spell, targets, data.area_tiles)
+    : success("spell_area_selection_valid", {
+      normalized_area_tiles: normalizeAreaTiles(data.area_tiles)
+    });
+  if (!areaSelectionValidation.ok) {
+    return areaSelectionValidation;
+  }
+  const normalizedAreaTiles = clone(areaSelectionValidation.payload.normalized_area_tiles || []);
   for (let index = 0; index < targets.length; index += 1) {
     const targetValidation = validateSpellTargeting(spell, caster, targets[index]);
     if (!targetValidation.ok) {
@@ -2382,6 +2555,8 @@ function performCastSpellAction(input) {
       resolutionPayload.removed_conditions = targetResults.flatMap((entry) => Array.isArray(entry.removed_conditions) ? entry.removed_conditions : []);
       resolutionPayload.vitality_result = targetResults[0] ? clone(targetResults[0].vitality_result) : null;
       resolutionPayload.defense_result = targetResults[0] ? clone(targetResults[0].defense_result) : null;
+    } else if (targetIds.length === 0 && areaSpell) {
+      resolutionPayload.target_results = [];
     } else {
       const targetEffect = resolveNonDamagingTargetEffect(combat, spell, casterId, targetId);
       if (!targetEffect.ok) {
@@ -2410,7 +2585,7 @@ function performCastSpellAction(input) {
     resolutionPayload.removed_conditions = clone(removedConditions.payload.removed_conditions || []);
   }
 
-  const activeEffectApplied = resolvePersistentSpellActiveEffect(combat, spell, caster, casterId, targetIds, data.area_tiles);
+  const activeEffectApplied = resolvePersistentSpellActiveEffect(combat, spell, caster, casterId, targetIds, normalizedAreaTiles);
   if (!activeEffectApplied.ok) {
     return activeEffectApplied;
   }

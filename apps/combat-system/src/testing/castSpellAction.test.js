@@ -2813,7 +2813,7 @@ function runCastSpellActionTests() {
       caster_id: casterId,
       target_id: "enemy-spell-001",
       target_ids: ["enemy-spell-001", "enemy-spell-002", "enemy-spell-003"],
-      area_tiles: [{ x: 1, y: 1 }, { x: 0, y: 2 }],
+      area_tiles: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 1 }, { x: 1, y: 1 }, { x: 0, y: 2 }],
       spell: spiritGuardians,
       saving_throw_fn: () => ({ final_total: 4, rolled_value: 4 }),
       damage_rng: () => 0
@@ -2822,12 +2822,120 @@ function runCastSpellActionTests() {
     assert.equal(out.ok, true);
     assert.equal(out.payload.active_effects_added.length, 1);
     assert.equal(out.payload.concentration_started.linked_effect_ids.length, 1);
-    assert.deepEqual(out.payload.active_effects_added[0].modifiers.area_tiles, [{ x: 1, y: 1 }, { x: 0, y: 2 }]);
+    assert.deepEqual(out.payload.active_effects_added[0].modifiers.area_tiles, [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 1 }, { x: 1, y: 1 }, { x: 0, y: 2 }]);
     assert.equal(out.payload.active_effects_added[0].modifiers.zone_behavior.on_turn_start_damage.damage_type, "radiant");
     assert.equal(out.payload.target_results.length, 3);
     assert.equal(out.payload.target_results.filter((entry) => {
       return Boolean(entry && entry.damage_result) && entry.damage_result.damage_type === "radiant";
     }).length, 3);
+  }, results);
+
+  runTest("fog_cloud_can_register_persistent_zone_without_participant_targets", () => {
+    const casterId = "caster-spell-fog-empty-001";
+    const combatId = "combat-spell-fog-empty-001";
+    const manager = createCombatReadyForSpell(combatId, casterId, {
+      known_spell_ids: ["fog_cloud"]
+    });
+    const fogCloud = {
+      spell_id: "fog_cloud",
+      name: "Fog Cloud",
+      casting_time: "1 action",
+      targeting: { type: "sphere_20ft" },
+      range: "120 feet",
+      duration: "concentration, up to 1 hour",
+      concentration: true,
+      attack_or_save: { type: "none" },
+      effect: {
+        utility_ref: "spell_fog_cloud_heavily_obscured",
+        targeting: "area"
+      }
+    };
+
+    const out = processCombatCastSpellRequest({
+      context: createCombatContext(manager, [fogCloud]),
+      player_id: casterId,
+      combat_id: combatId,
+      payload: {
+        spell_id: "fog_cloud",
+        area_tiles: [{ x: 2, y: 2 }, { x: 2, y: 3 }]
+      }
+    });
+
+    assert.equal(out.ok, true);
+    assert.equal(out.payload.cast_spell.target_results.length, 0);
+    assert.equal(out.payload.cast_spell.active_effects_added.length, 1);
+    assert.deepEqual(out.payload.cast_spell.active_effects_added[0].modifiers.area_tiles, [{ x: 2, y: 2 }, { x: 2, y: 3 }]);
+  }, results);
+
+  runTest("point_origin_area_spell_rejects_area_tiles_outside_spell_range", () => {
+    const casterId = "caster-spell-area-range-001";
+    const combatId = "combat-spell-area-range-001";
+    const manager = createCombatReadyForSpell(combatId, casterId, {
+      known_spell_ids: ["short_range_cloud"]
+    });
+    const shortRangeCloud = {
+      spell_id: "short_range_cloud",
+      name: "Short Range Cloud",
+      casting_time: "1 action",
+      targeting: { type: "sphere_10ft" },
+      range: "30 feet",
+      duration: "concentration, up to 1 minute",
+      concentration: true,
+      attack_or_save: { type: "none" },
+      effect: {
+        utility_ref: "spell_short_range_cloud",
+        targeting: "area"
+      }
+    };
+
+    const out = processCombatCastSpellRequest({
+      context: createCombatContext(manager, [shortRangeCloud]),
+      player_id: casterId,
+      combat_id: combatId,
+      payload: {
+        spell_id: "short_range_cloud",
+        area_tiles: [{ x: 8, y: 8 }]
+      }
+    });
+
+    assert.equal(out.ok, false);
+    assert.equal(out.error, "area spell tiles are not valid for the spell range/template");
+  }, results);
+
+  runTest("spirit_guardians_requires_self_centered_area_tiles", () => {
+    const casterId = "caster-spell-spirit-guardians-center-001";
+    const combatId = "combat-spell-spirit-guardians-center-001";
+    const manager = createCombatReadyForSpell(combatId, casterId, {
+      known_spell_ids: ["spirit_guardians"]
+    });
+    const spiritGuardians = {
+      spell_id: "spirit_guardians",
+      name: "Spirit Guardians",
+      casting_time: "1 action",
+      range: "self",
+      duration: "concentration, up to 10 minutes",
+      concentration: true,
+      targeting: { type: "aura_15ft" },
+      attack_or_save: { type: "save", save_ability: "wisdom" },
+      damage: { dice: "3d8", damage_type: "radiant" },
+      effect: {
+        damage_ref: "spell_damage_spirit_guardians",
+        targeting: "aura"
+      }
+    };
+
+    const out = processCombatCastSpellRequest({
+      context: createCombatContext(manager, [spiritGuardians]),
+      player_id: casterId,
+      combat_id: combatId,
+      payload: {
+        spell_id: "spirit_guardians",
+        area_tiles: [{ x: 2, y: 2 }, { x: 2, y: 3 }]
+      }
+    });
+
+    assert.equal(out.ok, false);
+    assert.equal(out.error, "self-centered aura tiles must include the caster position");
   }, results);
 
   runTest("magic_missile_can_split_projectiles_across_targets", () => {
@@ -3387,12 +3495,11 @@ function runCastSpellActionTests() {
       combat_id: combatId,
       payload: {
         spell_id: "fog_cloud",
-        target_ids: ["enemy-spell-001"]
+        area_tiles: [{ x: 2, y: 2 }, { x: 2, y: 3 }]
       }
     });
 
     assert.equal(first.ok, true);
-    const firstEffectId = first.payload.cast_spell.active_effects_added[0].effect_id;
 
     const combatAfterFirst = manager.getCombatById(combatId).payload.combat;
     const caster = findParticipant(combatAfterFirst, casterId);
@@ -3409,15 +3516,17 @@ function runCastSpellActionTests() {
       combat_id: combatId,
       payload: {
         spell_id: "spirit_guardians",
-        target_ids: ["enemy-spell-001"]
+        target_ids: ["enemy-spell-001"],
+        area_tiles: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 1 }]
       }
     });
 
     assert.equal(second.ok, true);
-    assert.equal(second.payload.cast_spell.concentration_replaced.removed_effect_ids.includes(firstEffectId), true);
+    assert.equal(Boolean(second.payload.cast_spell.concentration_replaced), true);
+    assert.equal(second.payload.cast_spell.concentration_replaced.source_spell_id, "fog_cloud");
+    assert.equal(second.payload.cast_spell.concentration_replaced.removed_effect_ids.length, 1);
     assert.equal(second.payload.cast_spell.active_effects_added.length, 1);
     assert.equal(second.payload.cast_spell.active_effects_added[0].modifiers.spell_id, "spirit_guardians");
-    assert.equal(second.payload.cast_spell.active_effects_added.some((entry) => entry.effect_id === firstEffectId), false);
   }, results);
 
   runTest("fear_does_not_apply_frightened_to_target_protected_by_heroism", () => {
