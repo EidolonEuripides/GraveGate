@@ -29,6 +29,8 @@ Scope:
 - Edge walls, cover, terrain masks, PNG output, and event adapters are in
 - Live gateway dry-run flow exists
 - Button-driven preview/confirm flow is in for move, attack, and supported spells
+- Authoritative persistent battlefield spell zones now render from combat/runtime state
+- Active difficult-terrain spell zones now affect movement preview/path cost on the map side
 - Battle-window + map flow is working, and combat action replies now use one structured result-feed path
 
 ### Dungeon maps
@@ -73,6 +75,7 @@ Scope:
 - Improve active mode clarity
 - Improve confirm/cancel/back experience
 - Improve spell/action result readability around the map
+- Keep persistent battlefield spell zones readable at a glance without turning the map into rules text
 - Keep the battle-window/text-summary split coherent across all supported combat action types
 
 ### 4. Dungeon-map authoring validation

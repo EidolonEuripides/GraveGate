@@ -1543,6 +1543,46 @@ function summarizeRecentCombatEvent(summary, entry) {
   return humanizeIdentifier(type, type);
 }
 
+function summarizeCombatActiveEffect(summary, effect) {
+  const safe = effect && typeof effect === "object" ? effect : {};
+  const label = cleanText(
+    safe.spell_name,
+    humanizeIdentifier(safe.source_spell_id || safe.type, "Effect")
+  );
+  const tiles = Array.isArray(safe.area_tiles) ? safe.area_tiles : [];
+  const firstTile = tiles[0] && typeof tiles[0] === "object" ? tiles[0] : null;
+  const parts = [];
+
+  if (tiles.length === 1 && firstTile) {
+    parts.push(`Tile ${formatPosition(firstTile)}`);
+  } else if (tiles.length > 1) {
+    parts.push(`${tiles.length} tiles`);
+  }
+  if (cleanText(safe.visibility_kind, "") === "heavily_obscured") {
+    parts.push("Heavily obscured");
+  }
+  if (cleanText(safe.terrain_kind, "") === "difficult") {
+    parts.push("Difficult terrain");
+  }
+  if (safe.on_enter_damage_type) {
+    parts.push(`On enter ${humanizeIdentifier(safe.on_enter_damage_type, "damage")}`);
+  }
+  if (safe.on_turn_start_damage_type) {
+    parts.push(`Turn start ${humanizeIdentifier(safe.on_turn_start_damage_type, "damage")}`);
+  }
+  if (safe.on_enter_condition_type) {
+    parts.push(`On enter ${formatConditionLabel(safe.on_enter_condition_type)}`);
+  }
+  if (safe.on_turn_start_condition_type) {
+    parts.push(`Turn start ${formatConditionLabel(safe.on_turn_start_condition_type)}`);
+  }
+  if (safe.hostile_only === true) {
+    parts.push("Hostile only");
+  }
+
+  return parts.length > 0 ? `${label}: ${parts.join(" | ")}` : label;
+}
+
 function buildCombatStateEmbed(summary) {
   const safe = summary && typeof summary === "object" ? summary : {};
   const orderedParticipants = getOrderedCombatParticipants(safe);
@@ -1574,6 +1614,9 @@ function buildCombatStateEmbed(summary) {
   const battlefieldLines = orderedParticipants.length > 0
     ? orderedParticipants.map((entry) => summarizeCombatParticipantLine(entry))
     : [];
+  const activeEffectLines = (Array.isArray(safe.active_effects) ? safe.active_effects : [])
+    .map((entry) => summarizeCombatActiveEffect(safe, entry))
+    .filter(Boolean);
   const recentEventLines = recentEvents.map((entry) => `- ${summarizeRecentCombatEvent(safe, entry)}`);
   return new EmbedBuilder()
     .setColor(0x4f545c)
@@ -1591,6 +1634,9 @@ function buildCombatStateEmbed(summary) {
       },
       ...buildChunkedFieldEntries("Initiative", initiativeLines, "(unavailable)"),
       ...buildChunkedFieldEntries("Battlefield", battlefieldLines, "(unavailable)"),
+      ...(activeEffectLines.length > 0
+        ? buildChunkedFieldEntries("Battlefield Effects", activeEffectLines, "(none)")
+        : []),
       ...buildChunkedFieldEntries("Recent Flow", recentEventLines, "(no recent actions)")
     )
     .setFooter({ text: "Grid positions use (x, y)." });
