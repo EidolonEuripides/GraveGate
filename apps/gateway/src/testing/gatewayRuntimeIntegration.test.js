@@ -5,6 +5,7 @@ const path = require("path");
 const { handleGatewayInteraction, __test } = require("../index");
 const { buildCombatMapState, buildTokenVisualOverrides } = require("../combatMapView");
 const { buildDungeonMapState, buildDungeonMapView } = require("../dungeonMapView");
+const { getTileProperties } = require("../../../map-system/src");
 
 async function runTest(name, fn, results) {
   try {
@@ -2974,6 +2975,15 @@ async function runGatewayRuntimeIntegrationTests() {
                           to_position: { x: 3, y: 1 }
                         }
                       ],
+                      active_effects: [
+                        {
+                          effect_id: "effect-darkness-001",
+                          source_spell_id: "darkness",
+                          spell_name: "Darkness",
+                          visibility_kind: "heavily_obscured",
+                          area_tiles: [{ x: 2, y: 2 }, { x: 2, y: 3 }]
+                        }
+                      ],
                       participants: [
                         {
                           participant_id: "hero-001",
@@ -3040,6 +3050,13 @@ async function runGatewayRuntimeIntegrationTests() {
     assert.equal(String(interaction._replyCalls[0].embeds[0].data.fields[1].value).includes("1. [H1] Aelar <- active"), true);
     assert.equal(String(interaction._replyCalls[0].embeds[0].data.fields[1].value).includes("2. [M1] Goblin 1"), true);
     assert.equal(String(interaction._replyCalls[0].embeds[0].data.fields[2].value).includes("[M1] Goblin 1 | HP 3/7 | Grid (3, 1) | Conditions Poisoned"), true);
+    assert.equal(
+      interaction._replyCalls[0].embeds[0].data.fields.some((field) => (
+        String(field.name).startsWith("Battlefield Effects") &&
+        String(field.value).includes("Darkness: 2 tiles | Heavily obscured")
+      )),
+      true
+    );
     assert.equal(
       interaction._replyCalls[0].embeds[0].data.fields.some((field) => (
         String(field.name).startsWith("Recent Flow") &&
@@ -3870,6 +3887,80 @@ async function runGatewayRuntimeIntegrationTests() {
     assert.equal(hero.border_color, "#ffd166");
     assert.equal(monster.border_color, null);
     assert.equal(monster.image_border_color, null);
+  }, results);
+
+  await runTest("combat_map_state_applies_authoritative_battlefield_effects_to_overlays_and_difficult_terrain", async () => {
+    const mapConfig = {
+      map_path: path.resolve(process.cwd(), "apps/map-system/data/maps/combat/map-12x12.base-map.json"),
+      profile_path: ""
+    };
+    const combatSummary = {
+      combat_id: "combat-gateway-effects-001",
+      status: "active",
+      round: 4,
+      active_participant_id: "hero-001",
+      active_effects: [
+        {
+          effect_id: "effect-web-zone-001",
+          source_spell_id: "web",
+          spell_name: "Web",
+          terrain_kind: "difficult",
+          on_enter_condition_type: "restrained",
+          on_turn_start_condition_type: "restrained",
+          area_tiles: [{ x: 2, y: 1 }]
+        },
+        {
+          effect_id: "effect-darkness-zone-001",
+          source_spell_id: "darkness",
+          spell_name: "Darkness",
+          visibility_kind: "heavily_obscured",
+          area_tiles: [{ x: 3, y: 1 }, { x: 3, y: 2 }]
+        },
+        {
+          effect_id: "effect-moonbeam-zone-001",
+          source_spell_id: "moonbeam",
+          spell_name: "Moonbeam",
+          on_enter_damage_type: "radiant",
+          on_turn_start_damage_type: "radiant",
+          area_tiles: [{ x: 4, y: 1 }]
+        }
+      ],
+      participants: [
+        {
+          participant_id: "hero-001",
+          name: "Aelar",
+          player_id: "player-gateway-effects-001",
+          team: "heroes",
+          current_hp: 12,
+          max_hp: 12,
+          position: { x: 1, y: 1 },
+          movement_remaining: 30,
+          conditions: []
+        }
+      ]
+    };
+
+    const out = buildCombatMapState({
+      combat_summary: combatSummary,
+      map_config: mapConfig,
+      token_overrides: [],
+      user_id: "player-gateway-effects-001"
+    });
+
+    assert.equal(out.ok, true);
+    assert.equal(
+      out.payload.map.overlays.some((overlay) => overlay && overlay.overlay_id === "effect-web-zone-001"),
+      true
+    );
+    assert.equal(
+      out.payload.map.overlays.some((overlay) => overlay && overlay.overlay_id === "effect-darkness-zone-001"),
+      true
+    );
+    assert.equal(
+      out.payload.map.overlays.some((overlay) => overlay && overlay.overlay_id === "effect-moonbeam-zone-001"),
+      true
+    );
+    assert.equal(getTileProperties(out.payload.map, { x: 2, y: 1 }).movement_cost, 2);
   }, results);
 
   await runTest("gateway_uses_runtime_failure_response_shape_for_replies", async () => {

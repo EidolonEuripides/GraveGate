@@ -1,6 +1,7 @@
 "use strict";
 
 const assert = require("assert");
+const childProcess = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const { normalizeProfilePaths, loadMapWithProfile } = require("../core/map-profile-loader");
@@ -66,6 +67,7 @@ const {
   buildSpellPreviewState,
   selectSpellTarget,
   confirmSpellSelection,
+  generateDungeonBlueprint,
   MAP_ACTION_TYPES,
   createMoveToCoordinateAction,
   createAttackTargetTokenAction,
@@ -3599,6 +3601,70 @@ function runMapSystemTests() {
     assert.equal(fs.existsSync(outputPath), true);
 
     fs.unlinkSync(doubledAssetPath);
+  }, results);
+
+  runTest("procedural_dungeon_blueprint_is_seeded_and_structurally_valid", () => {
+    const left = generateDungeonBlueprint({
+      map_id: "generator-seed-check",
+      seed: "stone-alpha-layout",
+      width: 30,
+      height: 30,
+      room_count: 8,
+      tile_size: 56
+    });
+    const right = generateDungeonBlueprint({
+      map_id: "generator-seed-check",
+      seed: "stone-alpha-layout",
+      width: 30,
+      height: 30,
+      room_count: 8,
+      tile_size: 56
+    });
+
+    assert.deepEqual(left, right);
+    assert.equal(Array.isArray(left.rooms), true);
+    assert.equal(left.rooms.length >= 6, true);
+    assert.equal(Array.isArray(left.connections), true);
+    assert.equal(left.connections.length >= 4, true);
+    assert.equal(left.floor_tiles.length > 0, true);
+    assert.equal(left.blocked_tiles.length > 0, true);
+    assert.equal(left.edge_walls.length > 0, true);
+    assert.equal(left.rooms.some((room) => room.shape !== "rectangle"), true);
+  }, results);
+
+  runTest("procedural_dungeon_cli_writes_complete_map_package", () => {
+    const outputRoot = path.resolve(process.cwd(), "apps/map-system/output/generated-dungeons-test");
+    const mapId = "cli-generated-smoke";
+    const outputDirectory = path.join(outputRoot, mapId);
+
+    fs.rmSync(outputDirectory, { recursive: true, force: true });
+
+    const stdout = childProcess.execFileSync(
+      process.execPath,
+      [
+        "scripts/map-system-cli.js",
+        "generate-dungeon",
+        `--map-id=${mapId}`,
+        "--seed=smoke-layout-seed",
+        "--rooms=8",
+        "--width=30",
+        "--height=30",
+        `--output-root=${outputRoot}`
+      ],
+      {
+        cwd: process.cwd(),
+        encoding: "utf8"
+      }
+    );
+    const payload = JSON.parse(stdout);
+
+    assert.equal(payload.ok, true);
+    assert.equal(fs.existsSync(path.join(outputDirectory, `${mapId}.dungeon-source.json`)), true);
+    assert.equal(fs.existsSync(path.join(outputDirectory, `${mapId}.base-map.png`)), true);
+    assert.equal(fs.existsSync(path.join(outputDirectory, `${mapId}.terrain-mask.png`)), true);
+    assert.equal(fs.existsSync(path.join(outputDirectory, `${mapId}.base-map.json`)), true);
+    assert.equal(fs.existsSync(path.join(outputDirectory, `${mapId}.dungeon-profile.json`)), true);
+    assert.equal(fs.existsSync(path.join(outputDirectory, `${mapId}.preview.png`)), true);
   }, results);
 
   runTest("asset_library_manifest_discovers_expected_groups", () => {

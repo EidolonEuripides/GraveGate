@@ -2810,6 +2810,42 @@ async function runReadCommandRuntimeTests() {
         to_position: { x: 3, y: 1 }
       }
     ];
+    seededCombat.active_effects = [
+      {
+        effect_id: "effect-runtime-read-darkness-001",
+        type: "spell_active_darkness",
+        source: {
+          participant_id: playerId
+        },
+        modifiers: {
+          spell_id: "darkness",
+          spell_name: "Darkness",
+          utility_ref: "spell_darkness_heavily_obscured",
+          area_tiles: [{ x: 2, y: 2 }, { x: 2, y: 3 }]
+        }
+      },
+      {
+        effect_id: "effect-runtime-read-web-001",
+        type: "spell_active_web",
+        source: {
+          participant_id: playerId
+        },
+        modifiers: {
+          spell_id: "web",
+          spell_name: "Web",
+          area_tiles: [{ x: 1, y: 2 }],
+          zone_behavior: {
+            terrain_kind: "difficult",
+            on_enter_condition: {
+              condition_type: "restrained"
+            },
+            on_turn_start_condition: {
+              condition_type: "restrained"
+            }
+          }
+        }
+      }
+    ];
     combatManager.combats.set(combatId, seededCombat);
     combatPersistence.saveCombatSnapshot({
       combat_state: combatManager.getCombatById(combatId).payload.combat
@@ -2856,6 +2892,11 @@ async function runReadCommandRuntimeTests() {
     assert.equal(response.payload.data.combat_summary.recent_events[0].hit, true);
     assert.equal(response.payload.data.combat_summary.recent_events[0].damage_dealt, 4);
     assert.deepEqual(response.payload.data.combat_summary.recent_events[1].to_position, { x: 3, y: 1 });
+    assert.equal(Array.isArray(response.payload.data.combat_summary.active_effects), true);
+    assert.equal(response.payload.data.combat_summary.active_effects.length, 2);
+    assert.equal(response.payload.data.combat_summary.active_effects[0].visibility_kind, "heavily_obscured");
+    assert.equal(response.payload.data.combat_summary.active_effects[1].terrain_kind, "difficult");
+    assert.equal(response.payload.data.combat_summary.active_effects[1].on_enter_condition_type, "restrained");
   }, results);
 
   await runTest("duplicate_replay_cast_request_is_rejected_cleanly", async () => {

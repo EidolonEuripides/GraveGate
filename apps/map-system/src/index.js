@@ -100,6 +100,7 @@ const {
   buildHazardOverlay
 } = require("./logic/overlay-builders");
 const { buildAssetLibraryManifest } = require("./procedural/asset-library");
+const { generateDungeonBlueprint, generateDungeonMapPackage, createSeededRandom } = require("./procedural/dungeon-generator");
 const { renderMapSvg } = require("./render/render-map-svg");
 const { renderMapPng } = require("./render/render-map-png");
 const { buildRenderRequest, renderMapAsync, createMapRenderQueue } = require("./render/map-render-service");
@@ -292,6 +293,9 @@ module.exports = {
   buildSelectionOverlay,
   buildHazardOverlay,
   buildAssetLibraryManifest,
+  createSeededRandom,
+  generateDungeonBlueprint,
+  generateDungeonMapPackage,
   renderMapSvg,
   renderMapPng,
   buildRenderRequest,

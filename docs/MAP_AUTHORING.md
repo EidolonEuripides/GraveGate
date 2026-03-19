@@ -188,6 +188,7 @@ Examples:
 - trap marker = authoring truth
 - exit marker = authoring truth
 - party position seed = authoring truth
+- persistent spell zone overlay from `combat.active_effects` = runtime combat truth rendered by the map
 - movement highlight = runtime preview
 - spell radius highlight = runtime preview
 - selected target ring = runtime preview

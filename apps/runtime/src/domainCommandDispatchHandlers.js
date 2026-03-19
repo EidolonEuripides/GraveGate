@@ -992,6 +992,61 @@ function summarizeParticipantConcentrationForGateway(participant) {
   };
 }
 
+const HEAVILY_OBSCURED_UTILITY_REFS = new Set([
+  "spell_fog_cloud_heavily_obscured",
+  "spell_darkness_heavily_obscured"
+]);
+
+function summarizeCombatActiveEffectForGateway(effect) {
+  const safeEffect = effect && typeof effect === "object" ? effect : {};
+  const modifiers = safeEffect.modifiers && typeof safeEffect.modifiers === "object" ? safeEffect.modifiers : {};
+  const zoneBehavior = modifiers.zone_behavior && typeof modifiers.zone_behavior === "object" ? modifiers.zone_behavior : {};
+  const utilityRef = modifiers.utility_ref ? String(modifiers.utility_ref) : null;
+  const areaTiles = Array.isArray(modifiers.area_tiles)
+    ? modifiers.area_tiles
+      .filter((tile) => tile && Number.isFinite(Number(tile.x)) && Number.isFinite(Number(tile.y)))
+      .map((tile) => ({
+        x: Math.floor(Number(tile.x)),
+        y: Math.floor(Number(tile.y))
+      }))
+    : [];
+
+  return {
+    effect_id: safeEffect.effect_id ? String(safeEffect.effect_id) : null,
+    type: safeEffect.type ? String(safeEffect.type) : null,
+    source_participant_id:
+      safeEffect.source && safeEffect.source.participant_id
+        ? String(safeEffect.source.participant_id)
+        : null,
+    source_spell_id: modifiers.spell_id ? String(modifiers.spell_id) : null,
+    spell_name: modifiers.spell_name ? String(modifiers.spell_name) : null,
+    target_type: modifiers.target_type ? String(modifiers.target_type) : null,
+    utility_ref: utilityRef,
+    visibility_kind: HEAVILY_OBSCURED_UTILITY_REFS.has(String(utilityRef || "").trim().toLowerCase())
+      ? "heavily_obscured"
+      : null,
+    terrain_kind: zoneBehavior.terrain_kind ? String(zoneBehavior.terrain_kind) : null,
+    hostile_only: zoneBehavior.hostile_only === true,
+    area_tiles: areaTiles,
+    on_enter_damage_type:
+      zoneBehavior.on_enter_damage && zoneBehavior.on_enter_damage.damage_type
+        ? String(zoneBehavior.on_enter_damage.damage_type)
+        : null,
+    on_turn_start_damage_type:
+      zoneBehavior.on_turn_start_damage && zoneBehavior.on_turn_start_damage.damage_type
+        ? String(zoneBehavior.on_turn_start_damage.damage_type)
+        : null,
+    on_enter_condition_type:
+      zoneBehavior.on_enter_condition && zoneBehavior.on_enter_condition.condition_type
+        ? String(zoneBehavior.on_enter_condition.condition_type)
+        : null,
+    on_turn_start_condition_type:
+      zoneBehavior.on_turn_start_condition && zoneBehavior.on_turn_start_condition.condition_type
+        ? String(zoneBehavior.on_turn_start_condition.condition_type)
+        : null
+  };
+}
+
 function summarizeCombatEventForGateway(entry) {
   const safeEntry = entry && typeof entry === "object" ? entry : {};
   return Object.assign({}, clone(safeEntry), {
@@ -1025,6 +1080,9 @@ function summarizeCombatStateForGateway(combat, activeParticipantId) {
   const initiativeOrder = Array.isArray(safeCombat.initiative_order)
     ? safeCombat.initiative_order.map((entry) => String(entry || "").trim()).filter(Boolean)
     : [];
+  const activeEffects = Array.isArray(safeCombat.active_effects)
+    ? safeCombat.active_effects.slice(0, 12).map((entry) => summarizeCombatActiveEffectForGateway(entry))
+    : [];
   return {
     combat_id: safeCombat.combat_id || null,
     status: safeCombat.status || null,
@@ -1032,6 +1090,8 @@ function summarizeCombatStateForGateway(combat, activeParticipantId) {
     turn_index: Number.isFinite(Number(safeCombat.turn_index)) ? Number(safeCombat.turn_index) : 0,
     active_participant_id: activeParticipantId || null,
     condition_count: conditions.length,
+    active_effect_count: activeEffects.length,
+    active_effects: activeEffects,
     recent_events: recentEvents,
     initiative_order: clone(initiativeOrder),
     participants: participants.slice(0, 8).map((entry) => {

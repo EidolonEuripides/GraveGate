@@ -5,6 +5,7 @@ const path = require("path");
 const { ActionRowBuilder, ButtonBuilder } = require("discord.js");
 const {
   TOKEN_TYPES,
+  OVERLAY_KINDS,
   loadMapWithProfile,
   validateMapStateShape,
   renderMapAsync,
@@ -13,6 +14,7 @@ const {
   handleButtonAction,
   adaptMapActionToCanonicalEvent,
   loadPlayerTokenCatalog,
+  getTileProperties,
   normalizeDebugFlags,
   formatDebugFlagSummary
 } = require("../../map-system/src");
@@ -144,6 +146,9 @@ function getTokenBorderColor(participant, combatSummary) {
 function buildCombatMapStatusText(combatSummary, interactionState) {
   return [
     "Map legend: gold ring = active turn, top chip = HP, bottom tag = map marker.",
+    Array.isArray(combatSummary && combatSummary.active_effects) && combatSummary.active_effects.length > 0
+      ? "Tinted tiles indicate active battlefield spell zones."
+      : "",
     formatDebugFlagSummary(interactionState && interactionState.debug_flags)
   ].filter(Boolean).join("\n");
 }
@@ -246,6 +251,116 @@ function buildMapTokensFromCombatSummary(combatSummary, tokenOverrides) {
   return applyTokenOverrides(tokens, tokenOverrides);
 }
 
+function normalizeCombatEffectTiles(effect) {
+  const areaTiles = Array.isArray(effect && effect.area_tiles) ? effect.area_tiles : [];
+  return areaTiles
+    .filter((tile) => Number.isFinite(Number(tile && tile.x)) && Number.isFinite(Number(tile && tile.y)))
+    .map((tile) => ({
+      x: Math.floor(Number(tile.x)),
+      y: Math.floor(Number(tile.y))
+    }));
+}
+
+function getCombatEffectVisual(effect) {
+  const safe = effect && typeof effect === "object" ? effect : {};
+  if (safe.visibility_kind === "heavily_obscured") {
+    return {
+      color: "#312e81",
+      opacity: 0.34
+    };
+  }
+  if (safe.on_enter_damage_type || safe.on_turn_start_damage_type) {
+    return {
+      color: "#38bdf8",
+      opacity: 0.28
+    };
+  }
+  if (safe.terrain_kind === "difficult") {
+    return {
+      color: "#f59e0b",
+      opacity: 0.24
+    };
+  }
+  if (safe.on_enter_condition_type || safe.on_turn_start_condition_type) {
+    return {
+      color: "#22c55e",
+      opacity: 0.24
+    };
+  }
+  return {
+    color: "#a855f7",
+    opacity: 0.22
+  };
+}
+
+function buildCombatEffectOverlays(combatSummary) {
+  const activeEffects = Array.isArray(combatSummary && combatSummary.active_effects) ? combatSummary.active_effects : [];
+  return activeEffects.map((effect, index) => {
+    const tiles = normalizeCombatEffectTiles(effect);
+    if (tiles.length === 0) {
+      return null;
+    }
+    const visual = getCombatEffectVisual(effect);
+    return {
+      overlay_id: cleanText(effect && effect.effect_id, `combat-active-effect-${index + 1}`),
+      kind: OVERLAY_KINDS.AREA,
+      color: visual.color,
+      opacity: visual.opacity,
+      tiles,
+      metadata: {
+        source_spell_id: cleanText(effect && effect.source_spell_id, ""),
+        spell_name: cleanText(effect && effect.spell_name, ""),
+        visibility_kind: cleanText(effect && effect.visibility_kind, ""),
+        terrain_kind: cleanText(effect && effect.terrain_kind, ""),
+        on_enter_damage_type: cleanText(effect && effect.on_enter_damage_type, ""),
+        on_turn_start_damage_type: cleanText(effect && effect.on_turn_start_damage_type, ""),
+        on_enter_condition_type: cleanText(effect && effect.on_enter_condition_type, ""),
+        on_turn_start_condition_type: cleanText(effect && effect.on_turn_start_condition_type, "")
+      }
+    };
+  }).filter(Boolean);
+}
+
+function buildCombatEffectTerrainEntries(map, combatSummary) {
+  const activeEffects = Array.isArray(combatSummary && combatSummary.active_effects) ? combatSummary.active_effects : [];
+  const byCoordinate = new Map();
+
+  activeEffects.forEach((effect, effectIndex) => {
+    if (cleanText(effect && effect.terrain_kind, "") !== "difficult") {
+      return;
+    }
+    normalizeCombatEffectTiles(effect).forEach((tile) => {
+      const key = `${tile.x},${tile.y}`;
+      const base =
+        byCoordinate.get(key) ||
+        Object.assign({ x: tile.x, y: tile.y }, getTileProperties(map, tile));
+      byCoordinate.set(key, {
+        x: tile.x,
+        y: tile.y,
+        terrain_type: cleanText(base.terrain_type, "mud"),
+        movement_cost: Math.max(Number.isFinite(Number(base.movement_cost)) ? Number(base.movement_cost) : 1, 2),
+        blocks_movement: base.blocks_movement === true,
+        blocks_sight: base.blocks_sight === true,
+        cover_level: cleanText(base.cover_level, ""),
+        is_hazard: base.is_hazard === true,
+        hazard_kind: cleanText(base.hazard_kind, ""),
+        damages_on_enter: base.damages_on_enter === true,
+        damages_on_turn_start: base.damages_on_turn_start === true,
+        zone_id: cleanText(effect && effect.effect_id, `combat-active-effect-${effectIndex + 1}`)
+      });
+    });
+  });
+
+  return Array.from(byCoordinate.values());
+}
+
+function applyCombatActiveEffectsToMap(map, combatSummary) {
+  const nextMap = clone(map);
+  nextMap.terrain = [].concat(nextMap.terrain || [], buildCombatEffectTerrainEntries(nextMap, combatSummary));
+  nextMap.overlays = [].concat(nextMap.overlays || [], buildCombatEffectOverlays(combatSummary));
+  return nextMap;
+}
+
 function buildCombatMapState(options) {
   const combatSummary = options.combat_summary;
   const mapConfig = options.map_config;
@@ -256,10 +371,11 @@ function buildCombatMapState(options) {
     };
   }
 
-  const map = loadMapWithProfile({
+  const loadedMap = loadMapWithProfile({
     map_path: mapConfig.map_path,
     profile_path: mapConfig.profile_path
   });
+  const map = applyCombatActiveEffectsToMap(loadedMap, combatSummary);
   map.tokens = buildMapTokensFromCombatSummary(combatSummary, options.token_overrides);
 
   const validation = validateMapStateShape(map);

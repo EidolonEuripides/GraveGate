@@ -12,6 +12,7 @@ const processTokenCli = require("../apps/map-system/src/cli/process-token");
 const processPlayerBatchCli = require("../apps/map-system/src/cli/process-player-token-batch");
 const processEnemyBatchCli = require("../apps/map-system/src/cli/process-enemy-token-batch");
 const stampTerrainCli = require("../apps/map-system/src/cli/stamp-terrain");
+const generateDungeonMapCli = require("../apps/map-system/src/cli/generate-dungeon-map");
 
 const COMMANDS = Object.freeze({
   test: async () => {
@@ -30,7 +31,8 @@ const COMMANDS = Object.freeze({
   "process-token": () => processTokenCli.main(),
   "process-player-tokens": () => processPlayerBatchCli.main(),
   "process-enemy-tokens": () => processEnemyBatchCli.main(),
-  "stamp-terrain": () => stampTerrainCli.main()
+  "stamp-terrain": () => stampTerrainCli.main(),
+  "generate-dungeon": () => generateDungeonMapCli.main()
 });
 
 async function main() {
@@ -51,7 +53,8 @@ async function main() {
       "  process-token",
       "  process-player-tokens",
       "  process-enemy-tokens",
-      "  stamp-terrain"
+      "  stamp-terrain",
+      "  generate-dungeon"
     ].join("\n"));
     process.exit(1);
   }

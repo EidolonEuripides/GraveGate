@@ -266,6 +266,8 @@ Next recommended resume point:
 - [x] Canonical `/combat` battle-state read path
 - [~] Cleaner combat screen UX in Discord
   - live map attachments, preview flows, and PNG output exist
+  - combat maps and the battle window now surface authoritative persistent battlefield spell zones from `combat.active_effects`
+  - active zone overlays now reflect canonical obscuration, difficult terrain, and zone-trigger metadata without making the map authoritative
   - action-result replies now use one structured `Action / State Changes / Turn` feed across current combat mutation types
   - selected-state readability and richer summary polish are still pending
 - [~] Better spell/action result summaries
